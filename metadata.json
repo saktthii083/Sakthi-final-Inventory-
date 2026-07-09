@@ -1,0 +1,6 @@
+{
+  "name": "Aruna Creations",
+  "description": "An inventory management system with stock tracking, sales & inward log, billing, reports, and secure user auth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

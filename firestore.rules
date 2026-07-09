@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net - Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.uid == "bd0jbxr3P0aaiOB5ou6EwiZnhq43" ||
+        ("email" in request.auth.token && request.auth.token.email.lower() == "sakthibala72@gmail.com") ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validation Helpers ---
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'sku', 'category', 'quantity', 'minStock', 'sellingPrice', 'purchasePrice', 'userId', 'updatedAt'])
+        && data.keys().size() <= 24
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && data.sku is string && data.sku.size() > 0 && data.sku.size() <= 100
+        && data.category is string && data.category.size() <= 100
+        && data.quantity is number
+        && data.sellingPrice is number
+        && data.purchasePrice is number
+        && data.userId is string && data.userId.size() > 0
+        && data.updatedAt is string
+        && (!data.keys().hasAny(['unit']) || (data.unit is string && data.unit.size() <= 100))
+        && (!data.keys().hasAny(['location']) || (data.location is string && data.location.size() <= 200))
+        && (!data.keys().hasAny(['description']) || (data.description is string && data.description.size() <= 1000))
+        && (!data.keys().hasAny(['material']) || (data.material is string && data.material.size() <= 100))
+        && (!data.keys().hasAny(['gsm']) || (data.gsm is string && data.gsm.size() <= 100))
+        && (!data.keys().hasAny(['color']) || (data.color is string && data.color.size() <= 100))
+        && (!data.keys().hasAny(['size']) || (data.size is string && data.size.size() <= 100));
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['type', 'sku', 'productName', 'quantity', 'price', 'total', 'date', 'userId'])
+        && data.type is string && (data.type == 'inward' || data.type == 'sales')
+        && data.sku is string && data.sku.size() > 0 && data.sku.size() <= 100
+        && data.productName is string && data.productName.size() > 0 && data.productName.size() <= 200
+        && data.quantity is number
+        && data.price is number
+        && data.total is number
+        && data.userId is string && data.userId.size() > 0
+        && data.date is string;
+    }
+
+    function isValidBill(data) {
+      return data.keys().hasAll(['billNo', 'subtotal', 'grandTotal', 'customerName', 'date', 'userId'])
+        && data.billNo is string && data.billNo.size() > 0 && data.billNo.size() <= 100
+        && data.subtotal is number
+        && data.grandTotal is number
+        && data.customerName is string && data.customerName.size() <= 200
+        && data.userId is string && data.userId.size() > 0
+        && data.date is string;
+    }
+
+    function isValidFile(data) {
+      return data.keys().hasAll(['name', 'size', 'type', 'uploadedAt', 'userId'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 256
+        && data.size is number
+        && data.type is string
+        && data.uploadedAt is string
+        && data.userId is string && data.userId.size() > 0;
+    }
+
+    function isValidCompany(data) {
+      return data.keys().hasAll(['name', 'userId', 'updatedAt'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && data.userId is string && data.userId.size() > 0
+        && data.updatedAt is string
+        && (!data.keys().hasAny(['gstin']) || (data.gstin is string && data.gstin.size() <= 100))
+        && (!data.keys().hasAny(['address']) || (data.address is string && data.address.size() <= 1000))
+        && (!data.keys().hasAny(['phone']) || (data.phone is string && data.phone.size() <= 100));
+    }
+
+    // --- Collection Security Rules ---
+
+    // Users Collection
+    match /users/{userId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Products Collection
+    match /products/{productId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Transactions Collection (Stock Ledger)
+    match /transactions/{transactionId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Bills Collection
+    match /bills/{billId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Files Collection
+    match /files/{fileId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Company Settings Collection
+    match /company/{companyId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

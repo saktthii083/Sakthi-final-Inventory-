@@ -1,0 +1,313 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "An inventory item or product in stock",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the product"
+        },
+        "sku": {
+          "type": "string",
+          "description": "The unique stock keeping unit or barcode number"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the product"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Current stock quantity in hand"
+        },
+        "minStock": {
+          "type": "number",
+          "description": "Minimum stock threshold for alerts"
+        },
+        "sellingPrice": {
+          "type": "number",
+          "description": "Selling price of the product"
+        },
+        "purchasePrice": {
+          "type": "number",
+          "description": "Purchase price of the product for margin calculations"
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement (e.g., pcs, kg, box)"
+        },
+        "location": {
+          "type": "string",
+          "description": "Warehouse or storage location"
+        },
+        "description": {
+          "type": "string",
+          "description": "Additional notes or description"
+        },
+        "material": {
+          "type": "string",
+          "description": "The material content or composition of the garment"
+        },
+        "gsm": {
+          "type": "string",
+          "description": "The material density in GSM"
+        },
+        "color": {
+          "type": "string",
+          "description": "The color of the product"
+        },
+        "size": {
+          "type": "string",
+          "description": "The size/dimension of the product"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the user who owns this inventory"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of the last update"
+        }
+      },
+      "required": ["name", "sku", "category", "quantity", "sellingPrice", "purchasePrice", "userId", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A ledger entry for stock movement (inward or sales)",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["inward", "sales"],
+          "description": "Type of transaction"
+        },
+        "sku": {
+          "type": "string",
+          "description": "SKU / Barcode of the product"
+        },
+        "productName": {
+          "type": "string",
+          "description": "Name of the product"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity moved"
+        },
+        "price": {
+          "type": "number",
+          "description": "Unit price at transaction time"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total transaction amount"
+        },
+        "referenceNo": {
+          "type": "string",
+          "description": "Invoice or PO reference number"
+        },
+        "counterParty": {
+          "type": "string",
+          "description": "Supplier name (for inward) or Customer name (for sales)"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "Cash, Card, UPI, or Credit"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of the transaction"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the user who performed this transaction"
+        }
+      },
+      "required": ["type", "sku", "productName", "quantity", "price", "total", "date", "userId"]
+    },
+    "Bill": {
+      "title": "Bill",
+      "description": "An invoice or sales bill generated for a customer",
+      "type": "object",
+      "properties": {
+        "billNo": {
+          "type": "string",
+          "description": "Sequential or custom bill invoice number"
+        },
+        "subtotal": {
+          "type": "number",
+          "description": "Subtotal amount before discount and GST"
+        },
+        "discount": {
+          "type": "number",
+          "description": "Discount amount applied"
+        },
+        "gst": {
+          "type": "number",
+          "description": "GST tax amount applied"
+        },
+        "grandTotal": {
+          "type": "number",
+          "description": "Final bill amount"
+        },
+        "customerName": {
+          "type": "string",
+          "description": "Name of the customer"
+        },
+        "customerPhone": {
+          "type": "string",
+          "description": "Phone number of the customer"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "Cash, Card, UPI, or Credit"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of the billing"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the user who generated this bill"
+        }
+      },
+      "required": ["billNo", "subtotal", "grandTotal", "customerName", "date", "userId"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with roles and account details",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The unique Firebase Authentication UID"
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name"
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of the user (e.g. admin, user)"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of last role or account change"
+        }
+      },
+      "required": ["uid", "email", "role", "updatedAt"]
+    },
+    "File": {
+      "title": "File",
+      "description": "An uploaded file metadata record for a user",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the file"
+        },
+        "size": {
+          "type": "number",
+          "description": "Size of the file in bytes"
+        },
+        "type": {
+          "type": "string",
+          "description": "MIME type of the file"
+        },
+        "uploadedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of the upload"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the user who uploaded this file"
+        },
+        "url": {
+          "type": "string",
+          "description": "The URL or data URI of the file"
+        }
+      },
+      "required": ["name", "size", "type", "uploadedAt", "userId"]
+    },
+    "Company": {
+      "title": "Company",
+      "description": "Company/Shop details for billing headings and invoices",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the company/shop"
+        },
+        "gstin": {
+          "type": "string",
+          "description": "The GSTIN registration number of the company"
+        },
+        "address": {
+          "type": "string",
+          "description": "The full address of the company"
+        },
+        "phone": {
+          "type": "string",
+          "description": "The contact phone number of the company"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The user ID associated with this company"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of the last update"
+        }
+      },
+      "required": ["name", "userId", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "User profiles with application roles"
+    },
+    "products/{productId}": {
+      "schema": {
+        "$ref": "#/entities/Product"
+      },
+      "description": "Inventory products collection indexed by auto-generated IDs"
+    },
+    "transactions/{transactionId}": {
+      "schema": {
+        "$ref": "#/entities/Transaction"
+      },
+      "description": "Inward and sales transaction ledger collection"
+    },
+    "bills/{billId}": {
+      "schema": {
+        "$ref": "#/entities/Bill"
+      },
+      "description": "Billing invoice history collection"
+    },
+    "files/{fileId}": {
+      "schema": {
+        "$ref": "#/entities/File"
+      },
+      "description": "Uploaded user documents and receipts"
+    },
+    "company/{companyId}": {
+      "schema": {
+        "$ref": "#/entities/Company"
+      },
+      "description": "Company configurations and shop receipts metadata"
+    }
+  }
+}
