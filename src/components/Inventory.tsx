@@ -1841,7 +1841,7 @@ export default function Inventory({
                     required
                     value={prodName}
                     onChange={(e) => setProdName(e.target.value.toUpperCase())}
-                    disabled={!!editingProduct}
+                    disabled={!!editingProduct && userRole !== 'admin'}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed font-bold"
                     placeholder={language === 'en' ? "e.g. T-SHIRT" : "எ.கா. டீ-சர்ட்"}
                     list="form-names-list"
@@ -1860,7 +1860,7 @@ export default function Inventory({
                     required
                     value={prodCategory}
                     onChange={(e) => setProdCategory(e.target.value.toUpperCase())}
-                    disabled={!!editingProduct}
+                    disabled={!!editingProduct && userRole !== 'admin'}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     placeholder="e.g. SHIRTS, PANTS, COTTON ROLL"
                     list="form-categories-list"
@@ -1878,7 +1878,7 @@ export default function Inventory({
                     type="text"
                     value={prodMaterial}
                     onChange={(e) => setProdMaterial(e.target.value.toUpperCase())}
-                    disabled={!!editingProduct}
+                    disabled={!!editingProduct && userRole !== 'admin'}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     placeholder="e.g. COTTON, POLYESTER, SILK"
                     list="form-materials-list"
@@ -1896,7 +1896,7 @@ export default function Inventory({
                     type="text"
                     value={prodGsm}
                     onChange={(e) => setProdGsm(e.target.value.toUpperCase())}
-                    disabled={!!editingProduct}
+                    disabled={!!editingProduct && userRole !== 'admin'}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     placeholder="e.g. 180 GSM, 220 GSM"
                     list="form-gsms-list"
@@ -1914,7 +1914,7 @@ export default function Inventory({
                     type="text"
                     value={prodColor}
                     onChange={(e) => setProdColor(e.target.value.toUpperCase())}
-                    disabled={!!editingProduct}
+                    disabled={!!editingProduct && userRole !== 'admin'}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     placeholder="e.g. RED, BLUE, BLACK"
                     list="form-colors-list"
@@ -2005,7 +2005,7 @@ export default function Inventory({
                         type="text"
                         value={prodSize}
                         onChange={(e) => setProdSize(e.target.value.toUpperCase())}
-                        disabled={!!editingProduct}
+                        disabled={!!editingProduct && userRole !== 'admin'}
                         className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                         placeholder="e.g. M, L, XL, XXL, 32"
                       />
@@ -2018,7 +2018,7 @@ export default function Inventory({
                         min="0"
                         value={prodQuantity}
                         onChange={(e) => setProdQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-                        disabled={!!editingProduct}
+                        disabled={!!editingProduct && userRole !== 'admin'}
                         className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -2122,7 +2122,7 @@ export default function Inventory({
                     min="0"
                     value={prodMinStock}
                     onChange={(e) => setProdMinStock(e.target.value === '' ? '' : Number(e.target.value))}
-                    disabled={!!editingProduct}
+                    disabled={!!editingProduct && userRole !== 'admin'}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   />
                 </div>
@@ -2136,7 +2136,7 @@ export default function Inventory({
                     required
                     value={prodSellingPrice}
                     onChange={(e) => setProdSellingPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                    disabled={!!editingProduct}
+                    disabled={!!editingProduct && userRole !== 'admin'}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed font-bold text-slate-900"
                   />
                 </div>
@@ -2150,7 +2150,7 @@ export default function Inventory({
                     required
                     value={prodPurchasePrice}
                     onChange={(e) => setProdPurchasePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                    disabled={!!editingProduct}
+                    disabled={!!editingProduct && userRole !== 'admin'}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   />
                 </div>
@@ -2163,7 +2163,7 @@ export default function Inventory({
                     min="0"
                     value={prodMaxDiscount}
                     onChange={(e) => setProdMaxDiscount(e.target.value === '' ? '' : Number(e.target.value))}
-                    disabled={!!editingProduct}
+                    disabled={!!editingProduct && userRole !== 'admin'}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     placeholder="₹"
                   />
@@ -2174,7 +2174,7 @@ export default function Inventory({
                   <select
                     value={prodUnit}
                     onChange={(e) => setProdUnit(e.target.value)}
-                    disabled={!!editingProduct}
+                    disabled={!!editingProduct && userRole !== 'admin'}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   >
                     <option value="pcs">{language === 'en' ? 'Pcs (Pieces)' : 'பீஸ் (Pcs)'}</option>
@@ -2233,7 +2233,7 @@ export default function Inventory({
                           )
                         )}
                         
-                        {!editingProduct && (
+                        {(!editingProduct || userRole === 'admin') && (
                           <button
                             type="button"
                             onClick={() => {
@@ -2249,7 +2249,7 @@ export default function Inventory({
                       </div>
                     </div>
                   ) : (
-                    editingProduct ? (
+                    (editingProduct && userRole !== 'admin') ? (
                       <div className="border border-slate-200 rounded-xl p-4 text-center bg-slate-50 text-slate-400 text-xs font-semibold">
                         {language === 'en' ? 'No Image Uploaded' : 'படம் எதுவும் பதிவேற்றப்படவில்லை'}
                       </div>
@@ -2543,8 +2543,9 @@ export default function Inventory({
                   </button>
                 </div>
 
-                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
-                  <div className="overflow-x-auto">
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs p-1 md:p-0">
+                  {/* Desktop View: Table */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-150 text-xs text-slate-700">
                       <thead>
                         <tr className="bg-slate-50 font-bold text-slate-500">
@@ -2682,6 +2683,158 @@ export default function Inventory({
                         })}
                       </tbody>
                     </table>
+                  </div>
+
+                  {/* Mobile View: Card-based rows */}
+                  <div className="block md:hidden p-3 space-y-4">
+                    {bulkSizesList.map((row, index) => {
+                      const handleRowChange = (field: string, val: any) => {
+                        setBulkSizesList(prev => prev.map((item, idx) => {
+                          if (idx === index) {
+                            return { ...item, [field]: val };
+                          }
+                          return item;
+                        }));
+                      };
+
+                      const handleRemoveRow = () => {
+                        if (row.id) {
+                          if (window.confirm(language === 'en' ? `Are you sure you want to delete SKU ${row.sku} entirely?` : `நிச்சயமாக SKU ${row.sku} ஐ முழுமையாக அழிக்க வேண்டுமா?`)) {
+                            onDeleteProduct(row.id)
+                              .then(() => {
+                                setBulkSizesList(prev => prev.filter((_, idx) => idx !== index));
+                                triggerFeedback('success', language === 'en' ? 'Variant deleted!' : 'அளவு நீக்கப்பட்டது!');
+                              })
+                              .catch(err => {
+                                console.error(err);
+                                triggerFeedback('error', language === 'en' ? 'Delete failed.' : 'அழிக்க முடியவில்லை.');
+                              });
+                          }
+                        } else {
+                          setBulkSizesList(prev => prev.filter((_, idx) => idx !== index));
+                        }
+                      };
+
+                      return (
+                        <div key={row.id || `row_mob_${index}`} className="p-4 border border-slate-200 rounded-xl bg-slate-50/50 space-y-3">
+                          <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                            <span className="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">
+                              {language === 'en' ? `Variant #${index + 1}` : `அளவு #${index + 1}`}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleRemoveRow}
+                              className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title={language === 'en' ? 'Delete row' : 'வரிசையை நீக்கு'}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Size Name */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                {language === 'en' ? 'Size *' : 'அளவு *'}
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={row.sizeName}
+                                onChange={(e) => handleRowChange('sizeName', e.target.value.toUpperCase())}
+                                placeholder="e.g. XL"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg uppercase font-extrabold text-sm text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+
+                            {/* Quantity */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                {language === 'en' ? 'Stock Qty *' : 'இருப்பு அளவு *'}
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                required
+                                value={row.quantity}
+                                onChange={(e) => handleRowChange('quantity', Math.max(0, Number(e.target.value)))}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-sm text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Selling Price */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                {t.sellingPrice}
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-2.5 text-slate-400 font-bold text-xs">₹</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={row.sellingPrice === 0 || row.sellingPrice === '' ? '' : row.sellingPrice}
+                                  onChange={(e) => handleRowChange('sellingPrice', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                                  className="w-full pl-6 pr-2 py-2 border border-slate-300 rounded-lg font-bold text-sm text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Purchase Cost */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                {t.manufacturingCost}
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-2.5 text-slate-400 font-bold text-xs">₹</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={row.purchasePrice === 0 || row.purchasePrice === '' ? '' : row.purchasePrice}
+                                  onChange={(e) => handleRowChange('purchasePrice', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                                  className="w-full pl-6 pr-2 py-2 border border-slate-300 rounded-lg font-bold text-sm text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Max Discount */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                {t.maxDiscount}
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-2.5 text-slate-400 font-bold text-xs">₹</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={row.maxDiscount === 0 || row.maxDiscount === '' ? '' : row.maxDiscount}
+                                  onChange={(e) => handleRowChange('maxDiscount', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                                  className="w-full pl-6 pr-2 py-2 border border-slate-300 rounded-lg font-bold text-sm text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Min Stock */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                {language === 'en' ? 'Min Stock' : 'குறைந்தபட்ச இருப்பு'}
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                required
+                                value={row.minStock}
+                                onChange={(e) => handleRowChange('minStock', Math.max(0, Number(e.target.value)))}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-sm text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
