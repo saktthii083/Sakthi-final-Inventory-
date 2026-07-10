@@ -472,19 +472,21 @@ export default function App() {
           updatedAt: new Date().toISOString()
         });
 
-        // Add ledger entry for product creation/initial stock
-        await handleAddTransaction({
-          type: 'inward',
-          sku: prodData.sku || '',
-          productName: prodData.name || '',
-          quantity: Number(prodData.quantity) || 0,
-          price: Number(prodData.purchasePrice) || 0,
-          total: (Number(prodData.quantity) || 0) * (Number(prodData.purchasePrice) || 0),
-          referenceNo: 'INITIAL STOCK ADDED',
-          counterParty: 'ADMIN / SYSTEM',
-          paymentMethod: 'System',
-          date: new Date().toISOString()
-        });
+        // Add ledger entry for product creation/initial stock if quantity > 0
+        if (Number(prodData.quantity) > 0) {
+          await handleAddTransaction({
+            type: 'inward',
+            sku: prodData.sku || '',
+            productName: prodData.size ? `${prodData.name} (${prodData.size})` : prodData.name || '',
+            quantity: Number(prodData.quantity) || 0,
+            price: Number(prodData.purchasePrice) || 0,
+            total: (Number(prodData.quantity) || 0) * (Number(prodData.purchasePrice) || 0),
+            referenceNo: 'INITIAL STOCK ADDED',
+            counterParty: 'ADMIN / SYSTEM',
+            paymentMethod: 'System',
+            date: new Date().toISOString()
+          });
+        }
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, 'products');
       }

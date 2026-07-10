@@ -628,22 +628,6 @@ export default function Inventory({
             size: pair.size.trim(),
             imageUrl: prodImageUrl.trim(),
           });
-
-          // Log transaction if initial quantity was entered
-          if (pair.quantity > 0) {
-            await onAddTransaction({
-              type: 'inward',
-              sku: generatedSku,
-              productName: `${prodName.trim()} (${pair.size.trim()})`,
-              quantity: Number(pair.quantity),
-              price: Number(prodPurchasePrice),
-              total: Number(pair.quantity) * Number(prodPurchasePrice),
-              referenceNo: 'INITIAL-STOCK',
-              counterParty: 'Self (Opening Balance)',
-              paymentMethod: 'N/A',
-              date: new Date().toISOString()
-            });
-          }
         }
 
         triggerFeedback('success', language === 'en' ? 'Product added successfully!' : 'தயாரிப்பு வெற்றிகரமாகச் சேர்க்கப்பட்டது!');
@@ -1137,20 +1121,6 @@ export default function Inventory({
             imageUrl: '',
           });
 
-          if (row.quantity > 0) {
-            await onAddTransaction({
-              type: 'inward',
-              sku: finalSku,
-              productName: `${row.name} (${row.size || 'Standard'})`,
-              quantity: row.quantity,
-              price: row.purchasePrice || 0,
-              total: row.quantity * (row.purchasePrice || 0),
-              referenceNo: 'BULK-IMPORT-NEW',
-              counterParty: 'Self (Bulk Import Initial)',
-              paymentMethod: 'N/A',
-              date: new Date().toISOString()
-            });
-          }
           createdCount++;
         }
       } catch (err) {
