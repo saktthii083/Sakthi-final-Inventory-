@@ -109,6 +109,7 @@ export default function App() {
     address: string;
     phone: string;
     logoUrl?: string;
+    deletePassword?: string;
   }>(() => {
     const saved = localStorage.getItem('demo_company');
     return saved ? JSON.parse(saved) : {
@@ -116,7 +117,8 @@ export default function App() {
       gstin: '33AAAAA1111A1Z1',
       address: 'Main Bazaar, Chennai, India',
       phone: '9876543210',
-      logoUrl: ''
+      logoUrl: '',
+      deletePassword: ''
     };
   });
   
@@ -419,7 +421,8 @@ export default function App() {
             gstin: data.gstin || '',
             address: data.address || '',
             phone: data.phone || '',
-            logoUrl: data.logoUrl || ''
+            logoUrl: data.logoUrl || '',
+            deletePassword: data.deletePassword || ''
           });
         }
       }, (error) => {
@@ -467,6 +470,20 @@ export default function App() {
           ...prodData,
           userId: 'bd0jbxr3P0aaiOB5ou6EwiZnhq43',
           updatedAt: new Date().toISOString()
+        });
+
+        // Add ledger entry for product creation/initial stock
+        await handleAddTransaction({
+          type: 'inward',
+          sku: prodData.sku || '',
+          productName: prodData.name || '',
+          quantity: Number(prodData.quantity) || 0,
+          price: Number(prodData.purchasePrice) || 0,
+          total: (Number(prodData.quantity) || 0) * (Number(prodData.purchasePrice) || 0),
+          referenceNo: 'INITIAL STOCK ADDED',
+          counterParty: 'ADMIN / SYSTEM',
+          paymentMethod: 'System',
+          date: new Date().toISOString()
         });
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, 'products');
@@ -548,20 +565,25 @@ export default function App() {
   // Delete Product
   const handleDeleteProduct = async (id: string) => {
     const productToDelete = products.find(p => p.id === id);
-    const sku = productToDelete?.sku;
 
     if (user) {
       try {
         await deleteDoc(doc(db, 'products', id));
         
-        if (sku) {
-          // Also delete all matching transaction logs in firestore
-          const matchedTxs = transactions.filter(t => t.sku === sku);
-          for (const tx of matchedTxs) {
-            if (tx.id) {
-              await deleteDoc(doc(db, 'transactions', tx.id));
-            }
-          }
+        // Log "deleted" transaction in the System Ledger (type: 'deleted')
+        if (productToDelete) {
+          await handleAddTransaction({
+            type: 'deleted',
+            sku: productToDelete.sku || '',
+            productName: productToDelete.name || '',
+            quantity: -Number(productToDelete.quantity || 0),
+            price: Number(productToDelete.sellingPrice || 0),
+            total: -Number(productToDelete.quantity || 0) * Number(productToDelete.sellingPrice || 0),
+            referenceNo: 'PRODUCT DELETED',
+            counterParty: 'ADMIN / SYSTEM',
+            paymentMethod: 'System',
+            date: new Date().toISOString()
+          });
         }
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, `products/${id}`);
@@ -613,7 +635,7 @@ export default function App() {
   };
 
   // Save Company Details Settings
-  const handleSaveCompanyDetails = async (details: { name: string; gstin: string; address: string; phone: string; logoUrl?: string }) => {
+  const handleSaveCompanyDetails = async (details: { name: string; gstin: string; address: string; phone: string; logoUrl?: string; deletePassword?: string }) => {
     if (user) {
       const uId = 'bd0jbxr3P0aaiOB5ou6EwiZnhq43';
       let snap;
@@ -1059,6 +1081,7 @@ export default function App() {
                   onAddTransaction={handleAddTransaction}
                   userRole={userRole}
                   onClearProducts={handleClearProducts}
+                  companyDetails={companyDetails}
                 />
               )}
 
@@ -1106,6 +1129,7 @@ export default function App() {
                   userRole={userRole}
                   onDeleteTransaction={handleDeleteTransaction}
                   onClearTransactions={handleClearTransactions}
+                  companyDetails={companyDetails}
                 />
               )}
             </motion.div>

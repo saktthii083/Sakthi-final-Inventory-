@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Language } from '../types';
-import { Building2, Save, Sparkles, ShieldCheck, ImagePlus, Trash2 } from 'lucide-react';
+import { Building2, Save, Sparkles, ShieldCheck, ImagePlus, Trash2, Lock } from 'lucide-react';
 
 interface CompanyDetails {
   name: string;
@@ -8,6 +8,7 @@ interface CompanyDetails {
   address: string;
   phone: string;
   logoUrl?: string;
+  deletePassword?: string;
 }
 
 interface CompanySettingsProps {
@@ -22,6 +23,7 @@ export default function CompanySettings({ language, companyDetails, onSave }: Co
   const [address, setAddress] = React.useState(companyDetails.address || '');
   const [phone, setPhone] = React.useState(companyDetails.phone || '');
   const [logoUrl, setLogoUrl] = React.useState(companyDetails.logoUrl || '');
+  const [deletePassword, setDeletePassword] = React.useState(companyDetails.deletePassword || '');
   const [isSaving, setIsSaving] = React.useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,6 +34,7 @@ export default function CompanySettings({ language, companyDetails, onSave }: Co
     setAddress(companyDetails.address || '');
     setPhone(companyDetails.phone || '');
     setLogoUrl(companyDetails.logoUrl || '');
+    setDeletePassword(companyDetails.deletePassword || '');
   }, [companyDetails]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,7 +97,8 @@ export default function CompanySettings({ language, companyDetails, onSave }: Co
         gstin: gstin.trim(),
         address: address.trim(),
         phone: phone.trim(),
-        logoUrl: logoUrl
+        logoUrl: logoUrl,
+        deletePassword: deletePassword.trim()
       });
     } catch (err) {
       console.error(err);
@@ -226,6 +230,21 @@ export default function CompanySettings({ language, companyDetails, onSave }: Co
               onChange={(e) => setPhone(e.target.value)}
               placeholder="e.g. 9876543210"
               className="block w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Action Password */}
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-1">
+              <Lock className="h-3 w-3" />
+              {language === 'en' ? 'Delete / Clear Password' : 'அழிக்க தேவையான பாஸ்வேர்டு'}
+            </label>
+            <input
+              type="text"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              placeholder={language === 'en' ? "e.g. 1234" : "எ.கா. 1234"}
+              className="block w-full px-4 py-2.5 bg-slate-50 border border-rose-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-rose-500"
             />
           </div>
 

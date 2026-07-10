@@ -112,13 +112,32 @@ interface InventoryProps {
   onAddTransaction: (tx: Omit<Transaction, 'id' | 'userId'>) => Promise<void>;
   userRole?: 'admin' | 'user' | null;
   onClearProducts?: () => Promise<void>;
+  companyDetails?: {
+    deletePassword?: string;
+  };
 }
 
 export default function Inventory({ 
   language, products, transactions = [], onAddProduct, onEditProduct, onDeleteProduct, onAddTransaction,
-  userRole, onClearProducts
+  userRole, onClearProducts, companyDetails
 }: InventoryProps) {
   const t = translations[language];
+
+  // Password verification states
+  const [passwordInput, setPasswordInput] = React.useState('');
+  const [passwordError, setPasswordError] = React.useState('');
+
+  const handleOpenClearProductsConfirm = () => {
+    setPasswordInput('');
+    setPasswordError('');
+    setShowClearProductsConfirm(true);
+  };
+
+  const handleCloseClearProductsConfirm = () => {
+    setShowClearProductsConfirm(false);
+    setPasswordInput('');
+    setPasswordError('');
+  };
 
   // --- UI STATE CONTROLS ---
   const [showProductModal, setShowProductModal] = React.useState(false);
@@ -643,12 +662,20 @@ export default function Inventory({
       triggerFeedback('error', 'Only admins can perform deletions.');
       return;
     }
+    setPasswordInput('');
+    setPasswordError('');
     setDeleteTarget({ id, name });
     setShowDeleteConfirm(true);
   };
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+    const expectedPassword = companyDetails?.deletePassword || '1234';
+    if (passwordInput.trim() !== expectedPassword) {
+      setPasswordError(language === 'en' ? 'Incorrect Password!' : 'தவறான கடவுச்சொல்!');
+      return;
+    }
+    setPasswordError('');
     setIsSubmitting(true);
     try {
       await onDeleteProduct(deleteTarget.id);
@@ -659,10 +686,17 @@ export default function Inventory({
       setIsSubmitting(false);
       setShowDeleteConfirm(false);
       setDeleteTarget(null);
+      setPasswordInput('');
     }
   };
 
   const handleConfirmClearProducts = async () => {
+    const expectedPassword = companyDetails?.deletePassword || '1234';
+    if (passwordInput.trim() !== expectedPassword) {
+      setPasswordError(language === 'en' ? 'Incorrect Password!' : 'தவறான கடவுச்சொல்!');
+      return;
+    }
+    setPasswordError('');
     setIsClearingProducts(true);
     try {
       if (onClearProducts) {
@@ -680,6 +714,7 @@ export default function Inventory({
     } finally {
       setIsClearingProducts(false);
       setShowClearProductsConfirm(false);
+      setPasswordInput('');
     }
   };
 
@@ -1409,7 +1444,7 @@ export default function Inventory({
           {userRole === 'admin' && (
             <button
               type="button"
-              onClick={() => setShowClearProductsConfirm(true)}
+              onClick={handleOpenClearProductsConfirm}
               className="px-4 py-2.5 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100/70 text-rose-700 hover:text-rose-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0 border border-rose-200 hover:border-rose-300 w-full sm:w-auto shadow-xs"
               title={language === 'en' ? 'Clear all products from the database' : 'தரவுத்தளத்தில் இருந்து அனைத்து தயாரிப்புகளையும் அழி'}
             >
@@ -1628,7 +1663,7 @@ export default function Inventory({
                               {sizeList.map((szItem) => {
                                 const isLow = szItem.product.quantity <= szItem.product.minStock;
                                 return (
-                                  <tr key={szItem.sku} className="hover:bg-slate-50/40 transition-colors">
+                                  <tr key={szItem.product.id || `${szItem.sku}_${szItem.sizeName}`} className="hover:bg-slate-50/40 transition-colors">
                                     <td className="px-4 py-3 font-extrabold text-slate-900 text-sm">
                                       <span className="bg-slate-100 px-2 py-0.5 rounded-md">
                                         {szItem.sizeName}
@@ -1695,7 +1730,7 @@ export default function Inventory({
                           {sizeList.map((szItem) => {
                             const isLow = szItem.product.quantity <= szItem.product.minStock;
                             return (
-                              <div key={szItem.sku} className="p-4 flex flex-col gap-3 hover:bg-slate-50/40 transition-colors">
+                              <div key={szItem.product.id || `${szItem.sku}_${szItem.sizeName}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50/40 transition-colors">
                                 {/* Top Line: Size Badge & Actions */}
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
@@ -2523,36 +2558,36 @@ export default function Inventory({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-semibold">
-                        {bulkSizesList.map((row, index) => {
-                          const handleRowChange = (field: string, val: any) => {
-                            setBulkSizesList(prev => prev.map((item, idx) => {
-                              if (idx === index) {
-                                return { ...item, [field]: val };
-                              }
-                              return item;
-                            }));
-                          };
+                          {bulkSizesList.map((row, index) => {
+                            const handleRowChange = (field: string, val: any) => {
+                              setBulkSizesList(prev => prev.map((item, idx) => {
+                                if (idx === index) {
+                                  return { ...item, [field]: val };
+                                }
+                                return item;
+                              }));
+                            };
 
-                          const handleRemoveRow = () => {
-                            if (row.id) {
-                              if (window.confirm(language === 'en' ? `Are you sure you want to delete SKU ${row.sku} entirely?` : `நிச்சயமாக SKU ${row.sku} ஐ முழுமையாக அழிக்க வேண்டுமா?`)) {
-                                onDeleteProduct(row.id)
-                                  .then(() => {
-                                    setBulkSizesList(prev => prev.filter((_, idx) => idx !== index));
-                                    triggerFeedback('success', language === 'en' ? 'Variant deleted!' : 'அளவு நீக்கப்பட்டது!');
-                                  })
-                                  .catch(err => {
-                                    console.error(err);
-                                    triggerFeedback('error', language === 'en' ? 'Delete failed.' : 'அழிக்க முடியவில்லை.');
-                                  });
+                            const handleRemoveRow = () => {
+                              if (row.id) {
+                                if (window.confirm(language === 'en' ? `Are you sure you want to delete SKU ${row.sku} entirely?` : `நிச்சயமாக SKU ${row.sku} ஐ முழுமையாக அழிக்க வேண்டுமா?`)) {
+                                  onDeleteProduct(row.id)
+                                    .then(() => {
+                                      setBulkSizesList(prev => prev.filter((_, idx) => idx !== index));
+                                      triggerFeedback('success', language === 'en' ? 'Variant deleted!' : 'அளவு நீக்கப்பட்டது!');
+                                    })
+                                    .catch(err => {
+                                      console.error(err);
+                                      triggerFeedback('error', language === 'en' ? 'Delete failed.' : 'அழிக்க முடியவில்லை.');
+                                    });
+                                }
+                              } else {
+                                setBulkSizesList(prev => prev.filter((_, idx) => idx !== index));
                               }
-                            } else {
-                              setBulkSizesList(prev => prev.filter((_, idx) => idx !== index));
-                            }
-                          };
+                            };
 
-                          return (
-                            <tr key={row.sku} className="hover:bg-slate-50/50">
+                            return (
+                              <tr key={row.id || `row_${index}`} className="hover:bg-slate-50/50">
                               {/* Size Name */}
                               <td className="px-4 py-2">
                                 <input
@@ -3090,6 +3125,33 @@ export default function Inventory({
                     : `"${deleteTarget.name}" தயாரிப்பை அழிக்க நீங்கள் உறுதியாக இருக்கிறீர்களா? இந்தச் செயலைத் திரும்பப் பெற முடியாது.`}
                 </p>
               </div>
+
+              {/* Password Verification Field */}
+              <div className="space-y-1.5 text-left pt-2 border-t border-slate-100">
+                <label className="block text-[10px] font-black text-rose-500 uppercase tracking-widest">
+                  {language === 'en' ? 'Enter Delete/Clear Password' : 'அழிக்க தேவையான பாஸ்வேர்டு'}
+                </label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    setPasswordError('');
+                  }}
+                  className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-rose-500 font-mono"
+                  placeholder={language === 'en' ? 'Enter password' : 'கடவுச்சொல் உள்ளிடவும்'}
+                />
+                {passwordError && (
+                  <p className="text-[10px] text-red-500 font-bold">{passwordError}</p>
+                )}
+                {!companyDetails?.deletePassword && (
+                  <p className="text-[9px] text-slate-400 font-medium mt-1">
+                    {language === 'en' 
+                      ? "Note: Default password is '1234'. (Change in Company Settings)" 
+                      : "குறிப்பு: முன்னிருப்பு கடவுச்சொல் '1234' ஆகும். (நிறுவனத்தின் அமைப்புகளில் மாற்றவும்)"}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-150 flex justify-center gap-3 text-xs">
@@ -3099,6 +3161,8 @@ export default function Inventory({
                 onClick={() => {
                   setShowDeleteConfirm(false);
                   setDeleteTarget(null);
+                  setPasswordInput('');
+                  setPasswordError('');
                 }}
                 className="flex-1 py-2.5 border border-slate-200 text-slate-600 bg-white hover:bg-slate-100 rounded-xl font-bold cursor-pointer transition-colors disabled:opacity-50"
               >
@@ -3145,13 +3209,40 @@ export default function Inventory({
                     : 'தரவுத்தளத்தில் இருந்து அனைத்து தயாரிப்புகளையும் முழுமையாக அழிக்க விரும்புகிறீர்களா? இந்த செயல் நிரந்தரமானது மற்றும் மீட்டெடுக்க முடியாது.'}
                 </p>
               </div>
+
+              {/* Password Verification Field */}
+              <div className="space-y-1.5 text-left pt-2 border-t border-slate-100">
+                <label className="block text-[10px] font-black text-rose-500 uppercase tracking-widest">
+                  {language === 'en' ? 'Enter Delete/Clear Password' : 'அழிக்க தேவையான பாஸ்வேர்டு'}
+                </label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    setPasswordError('');
+                  }}
+                  className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-rose-500 font-mono"
+                  placeholder={language === 'en' ? 'Enter password' : 'கடவுச்சொல் உள்ளிடவும்'}
+                />
+                {passwordError && (
+                  <p className="text-[10px] text-red-500 font-bold">{passwordError}</p>
+                )}
+                {!companyDetails?.deletePassword && (
+                  <p className="text-[9px] text-slate-400 font-medium mt-1">
+                    {language === 'en' 
+                      ? "Note: Default password is '1234'. (Change in Company Settings)" 
+                      : "குறிப்பு: முன்னிருப்பு கடவுச்சொல் '1234' ஆகும். (நிறுவனத்தின் அமைப்புகளில் மாற்றவும்)"}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-150 flex justify-center gap-3 text-xs">
               <button
                 type="button"
                 disabled={isClearingProducts}
-                onClick={() => setShowClearProductsConfirm(false)}
+                onClick={handleCloseClearProductsConfirm}
                 className="flex-1 py-2.5 border border-slate-200 text-slate-600 bg-white hover:bg-slate-100 rounded-xl font-bold cursor-pointer transition-colors disabled:opacity-50"
               >
                 {language === 'en' ? 'No, Cancel' : 'இல்லை, ரத்து செய்'}

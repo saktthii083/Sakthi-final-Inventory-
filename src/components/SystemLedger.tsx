@@ -9,6 +9,9 @@ interface SystemLedgerProps {
   userRole?: 'admin' | 'user' | null;
   onDeleteTransaction?: (id: string) => Promise<void>;
   onClearTransactions?: () => Promise<void>;
+  companyDetails?: {
+    deletePassword?: string;
+  };
 }
 
 export default function SystemLedger({
@@ -17,7 +20,8 @@ export default function SystemLedger({
   products = [],
   userRole,
   onDeleteTransaction,
-  onClearTransactions
+  onClearTransactions,
+  companyDetails
 }: SystemLedgerProps) {
   const [ledgerTypeFilter, setLedgerTypeFilter] = React.useState<'all' | 'sales' | 'inward' | 'restock' | 'deleted' | 'edited'>('all');
   const [ledgerSearch, setLedgerSearch] = React.useState('');
@@ -38,15 +42,39 @@ export default function SystemLedger({
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [showClearConfirm, setShowClearConfirm] = React.useState(false);
   const [isClearing, setIsClearing] = React.useState(false);
+
+  // Password verification states
+  const [passwordInput, setPasswordInput] = React.useState('');
+  const [passwordError, setPasswordError] = React.useState('');
   const [feedback, setFeedback] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleDeleteClick = (tx: Transaction) => {
+    setPasswordInput('');
+    setPasswordError('');
     setDeleteTarget(tx);
     setShowDeleteConfirm(true);
   };
 
+  const handleOpenClearConfirm = () => {
+    setPasswordInput('');
+    setPasswordError('');
+    setShowClearConfirm(true);
+  };
+
+  const handleCloseClearConfirm = () => {
+    setShowClearConfirm(false);
+    setPasswordInput('');
+    setPasswordError('');
+  };
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+    const expectedPassword = companyDetails?.deletePassword || '1234';
+    if (passwordInput.trim() !== expectedPassword) {
+      setPasswordError(language === 'en' ? 'Incorrect Password!' : 'தவறான கடவுச்சொல்!');
+      return;
+    }
+    setPasswordError('');
     setIsDeleting(true);
     try {
       if (onDeleteTransaction) {
@@ -67,10 +95,17 @@ export default function SystemLedger({
       setIsDeleting(false);
       setShowDeleteConfirm(false);
       setDeleteTarget(null);
+      setPasswordInput('');
     }
   };
 
   const handleConfirmClear = async () => {
+    const expectedPassword = companyDetails?.deletePassword || '1234';
+    if (passwordInput.trim() !== expectedPassword) {
+      setPasswordError(language === 'en' ? 'Incorrect Password!' : 'தவறான கடவுச்சொல்!');
+      return;
+    }
+    setPasswordError('');
     setIsClearing(true);
     try {
       if (onClearTransactions) {
@@ -90,6 +125,7 @@ export default function SystemLedger({
     } finally {
       setIsClearing(false);
       setShowClearConfirm(false);
+      setPasswordInput('');
     }
   };
 
@@ -423,7 +459,7 @@ export default function SystemLedger({
           {userRole === 'admin' && (
             <button
               type="button"
-              onClick={() => setShowClearConfirm(true)}
+              onClick={handleOpenClearConfirm}
               className="px-4 py-2.5 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100/70 text-rose-700 hover:text-rose-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-rose-200 hover:border-rose-300 w-full sm:w-auto shrink-0"
               title={language === 'en' ? 'Clear all logs from the backend database' : 'தரவுத்தளத்தில் இருந்து அனைத்து பதிவுகளையும் அழி'}
             >
@@ -868,6 +904,33 @@ export default function SystemLedger({
                     : `"${deleteTarget.productName}" க்கான இந்த ${deleteTarget.type === 'sales' ? 'விற்பனை' : 'உள்வரவு'} லெட்ஜர் பதிவை உறுதியாக அழிக்க விரும்புகிறீர்களா? இது தானாகவே இருப்பு எண்ணிக்கையை மாற்றியமைக்காது.`}
                 </p>
               </div>
+
+              {/* Password Verification Field */}
+              <div className="space-y-1.5 text-left pt-2 border-t border-slate-100">
+                <label className="block text-[10px] font-black text-rose-500 uppercase tracking-widest">
+                  {language === 'en' ? 'Enter Delete/Clear Password' : 'அழிக்க தேவையான பாஸ்வேர்டு'}
+                </label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    setPasswordError('');
+                  }}
+                  className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-rose-500 font-mono"
+                  placeholder={language === 'en' ? 'Enter password' : 'கடவுச்சொல் உள்ளிடவும்'}
+                />
+                {passwordError && (
+                  <p className="text-[10px] text-red-500 font-bold">{passwordError}</p>
+                )}
+                {!companyDetails?.deletePassword && (
+                  <p className="text-[9px] text-slate-400 font-medium mt-1">
+                    {language === 'en' 
+                      ? "Note: Default password is '1234'. (Change in Company Settings)" 
+                      : "குறிப்பு: முன்னிருப்பு கடவுச்சொல் '1234' ஆகும். (நிறுவனத்தின் அமைப்புகளில் மாற்றவும்)"}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-150 flex justify-center gap-3 text-xs">
@@ -877,6 +940,8 @@ export default function SystemLedger({
                 onClick={() => {
                   setShowDeleteConfirm(false);
                   setDeleteTarget(null);
+                  setPasswordInput('');
+                  setPasswordError('');
                 }}
                 className="flex-1 py-2.5 border border-slate-200 text-slate-600 bg-white hover:bg-slate-100 rounded-xl font-bold cursor-pointer transition-colors disabled:opacity-50"
               >
@@ -923,13 +988,40 @@ export default function SystemLedger({
                     : 'தரவுத்தளத்தில் இருந்து அனைத்து பரிவர்த்தனை பதிவுகளையும் முழுமையாக அழிக்க விரும்புகிறீர்களா? இந்த செயல் நிரந்தரமானது மற்றும் மீட்டெடுக்க முடியாது.'}
                 </p>
               </div>
+
+              {/* Password Verification Field */}
+              <div className="space-y-1.5 text-left pt-2 border-t border-slate-100">
+                <label className="block text-[10px] font-black text-rose-500 uppercase tracking-widest">
+                  {language === 'en' ? 'Enter Delete/Clear Password' : 'அழிக்க தேவையான பாஸ்வேர்டு'}
+                </label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    setPasswordError('');
+                  }}
+                  className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-rose-500 font-mono"
+                  placeholder={language === 'en' ? 'Enter password' : 'கடவுச்சொல் உள்ளிடவும்'}
+                />
+                {passwordError && (
+                  <p className="text-[10px] text-red-500 font-bold">{passwordError}</p>
+                )}
+                {!companyDetails?.deletePassword && (
+                  <p className="text-[9px] text-slate-400 font-medium mt-1">
+                    {language === 'en' 
+                      ? "Note: Default password is '1234'. (Change in Company Settings)" 
+                      : "குறிப்பு: முன்னிருப்பு கடவுச்சொல் '1234' ஆகும். (நிறுவனத்தின் அமைப்புகளில் மாற்றவும்)"}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-150 flex justify-center gap-3 text-xs">
               <button
                 type="button"
                 disabled={isClearing}
-                onClick={() => setShowClearConfirm(false)}
+                onClick={handleCloseClearConfirm}
                 className="flex-1 py-2.5 border border-slate-200 text-slate-600 bg-white hover:bg-slate-100 rounded-xl font-bold cursor-pointer transition-colors disabled:opacity-50"
               >
                 {language === 'en' ? 'No, Cancel' : 'இல்லை, ரத்து செய்'}
