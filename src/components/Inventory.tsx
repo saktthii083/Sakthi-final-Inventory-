@@ -122,6 +122,32 @@ export default function Inventory({
 
   // --- UI STATE CONTROLS ---
   const [showProductModal, setShowProductModal] = React.useState(false);
+  const [showBulkColorModal, setShowBulkColorModal] = React.useState(false);
+  const [bulkColorGroup, setBulkColorGroup] = React.useState<GroupedInventoryItem | null>(null);
+  const [bulkColorName, setBulkColorName] = React.useState('');
+  
+  // Bulk form fields
+  const [bulkProdName, setBulkProdName] = React.useState('');
+  const [bulkProdCategory, setBulkProdCategory] = React.useState('');
+  const [bulkProdMaterial, setBulkProdMaterial] = React.useState('');
+  const [bulkProdGsm, setBulkProdGsm] = React.useState('');
+  const [bulkProdLocation, setBulkProdLocation] = React.useState('');
+  const [bulkProdDescription, setBulkProdDescription] = React.useState('');
+  const [bulkProdImageUrl, setBulkProdImageUrl] = React.useState('');
+  const [bulkCompressionInfo, setBulkCompressionInfo] = React.useState<{ originalSize: string; compressedSize: string; ratio: string } | null>(null);
+  const [isBulkSubmitting, setIsBulkSubmitting] = React.useState(false);
+  
+  const [bulkSizesList, setBulkSizesList] = React.useState<{
+    id: string;
+    sku: string;
+    sizeName: string;
+    quantity: number;
+    minStock: number;
+    sellingPrice: number;
+    purchasePrice: number;
+    maxDiscount: number | '';
+    product: Product;
+  }[]>([]);
   const [editingProduct, setEditingProduct] = React.useState<Product | null>(null);
   const [showClearProductsConfirm, setShowClearProductsConfirm] = React.useState(false);
   const [isClearingProducts, setIsClearingProducts] = React.useState(false);
@@ -217,6 +243,180 @@ export default function Inventory({
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  // --- BULK COLOR EDIT FUNCTIONS ---
+  const openBulkColorEditModal = (group: GroupedInventoryItem, colorName: string) => {
+    setBulkColorGroup(group);
+    setBulkColorName(colorName);
+    
+    const colorData = group.colors[colorName];
+    if (!colorData) return;
+
+    const firstProduct = colorData.sizes[0]?.product;
+    setBulkProdName(group.name);
+    setBulkProdCategory(group.category);
+    setBulkProdMaterial(group.material || '');
+    setBulkProdGsm(group.gsm || '');
+    setBulkProdLocation(firstProduct?.location || '');
+    setBulkProdDescription(firstProduct?.description || '');
+    setBulkProdImageUrl(firstProduct?.imageUrl || '');
+    setBulkCompressionInfo(null);
+
+    const sizesToEdit = colorData.sizes.map(s => ({
+      id: s.product.id || '',
+      sku: s.sku,
+      sizeName: s.sizeName,
+      quantity: s.quantity,
+      minStock: s.product.minStock,
+      sellingPrice: s.product.sellingPrice === 0 ? '' : s.product.sellingPrice,
+      purchasePrice: s.product.purchasePrice === 0 ? '' : s.product.purchasePrice,
+      maxDiscount: s.product.maxDiscount === 0 || s.product.maxDiscount === undefined ? '' : s.product.maxDiscount,
+      product: s.product,
+    }));
+    setBulkSizesList(sizesToEdit);
+    setShowBulkColorModal(true);
+  };
+
+  const handleAddBulkSizeRow = () => {
+    const tempSku = `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    setBulkSizesList(prev => {
+      const lastRow = prev[prev.length - 1];
+      return [
+        ...prev,
+        {
+          id: '',
+          sku: tempSku,
+          sizeName: '',
+          quantity: 0,
+          minStock: 0,
+          sellingPrice: lastRow?.sellingPrice !== undefined ? lastRow.sellingPrice : '',
+          purchasePrice: lastRow?.purchasePrice !== undefined ? lastRow.purchasePrice : '',
+          maxDiscount: lastRow?.maxDiscount !== undefined ? lastRow.maxDiscount : '',
+          product: {
+            id: '',
+            sku: tempSku,
+            name: bulkProdName,
+            category: bulkProdCategory || 'General',
+            material: bulkProdMaterial,
+            gsm: bulkProdGsm,
+            color: bulkColorName,
+            size: '',
+            quantity: 0,
+            minStock: 0,
+            sellingPrice: lastRow?.sellingPrice !== undefined && lastRow.sellingPrice !== '' ? Number(lastRow.sellingPrice) : 0,
+            purchasePrice: lastRow?.purchasePrice !== undefined && lastRow.purchasePrice !== '' ? Number(lastRow.purchasePrice) : 0,
+            location: bulkProdLocation,
+            description: bulkProdDescription,
+            imageUrl: bulkProdImageUrl,
+            unit: bulkColorGroup?.colors[bulkColorName]?.sizes[0]?.product.unit || 'pcs'
+          }
+        }
+      ];
+    });
+  };
+
+  const processAndCompressBulkImageFile = async (file: File) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      if (typeof reader.result === 'string') {
+        const originalBase64 = reader.result;
+        try {
+          const result = await compressImage(originalBase64);
+          setBulkProdImageUrl(result.dataUrl);
+          
+          const ratio = result.originalSizeKb > 0 
+            ? Math.round(((result.originalSizeKb - result.compressedSizeKb) / result.originalSizeKb) * 100)
+            : 0;
+          
+          setBulkCompressionInfo({
+            originalSize: `${result.originalSizeKb} KB`,
+            compressedSize: `${result.compressedSizeKb} KB`,
+            ratio: `${ratio}%`
+          });
+        } catch (error) {
+          console.error("Bulk image compression failed, using original", error);
+          setBulkProdImageUrl(originalBase64);
+          const sizeKb = Math.round((originalBase64.length * 3) / 4 / 1024);
+          setBulkCompressionInfo({
+            originalSize: `${sizeKb} KB`,
+            compressedSize: `${sizeKb} KB`,
+            ratio: '0%'
+          });
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBulkColorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isBulkSubmitting) return;
+
+    if (!bulkProdName.trim()) {
+      triggerFeedback('error', language === 'en' ? 'Product Name is required!' : 'தயாரிப்பு பெயர் தேவை!');
+      return;
+    }
+    if (!bulkColorName.trim()) {
+      triggerFeedback('error', language === 'en' ? 'Color Name is required!' : 'வண்ணத்தின் பெயர் தேவை!');
+      return;
+    }
+
+    const invalidRow = bulkSizesList.find(row => !row.sizeName.trim());
+    if (invalidRow) {
+      triggerFeedback('error', language === 'en' ? 'All sizes must have a name!' : 'அனைத்து அளவுகளுக்கும் பெயர் இருக்க வேண்டும்!');
+      return;
+    }
+
+    setIsBulkSubmitting(true);
+    try {
+      const updatePromises = bulkSizesList.map(async (szItem) => {
+        const itemData = {
+          name: bulkProdName.trim(),
+          category: bulkProdCategory.trim() || 'General',
+          material: bulkProdMaterial.trim(),
+          gsm: bulkProdGsm.trim(),
+          location: bulkProdLocation.trim(),
+          description: bulkProdDescription.trim(),
+          imageUrl: bulkProdImageUrl.trim(),
+          color: bulkColorName.trim(),
+          size: szItem.sizeName.trim(),
+          quantity: Number(szItem.quantity),
+          minStock: Number(szItem.minStock),
+          sellingPrice: Number(szItem.sellingPrice),
+          purchasePrice: Number(szItem.purchasePrice),
+          maxDiscount: szItem.maxDiscount === '' ? undefined : Number(szItem.maxDiscount),
+          unit: bulkColorGroup?.colors[bulkColorName]?.sizes[0]?.product.unit || 'pcs'
+        };
+
+        if (szItem.id) {
+          await onEditProduct(szItem.id, itemData);
+        } else {
+          let generatedSku = '';
+          let exists = true;
+          let attempts = 0;
+          while (exists && attempts < 10) {
+            const randomNum = Math.floor(100000 + Math.random() * 900000);
+            generatedSku = `SKU-${randomNum}`;
+            exists = products.some(p => p.sku.toLowerCase() === generatedSku.toLowerCase());
+            attempts++;
+          }
+          await onAddProduct({
+            ...itemData,
+            sku: generatedSku
+          });
+        }
+      });
+
+      await Promise.all(updatePromises);
+      triggerFeedback('success', language === 'en' ? 'All variants updated successfully!' : 'அனைத்து அளவுகளும் வெற்றிகரமாகப் புதுப்பிக்கப்பட்டன!');
+      setShowBulkColorModal(false);
+    } catch (err) {
+      console.error("Bulk update failed:", err);
+      triggerFeedback('error', language === 'en' ? 'Failed to update all variants.' : 'அனைத்து அளவுகளையும் புதுப்பிக்க முடியவில்லை.');
+    } finally {
+      setIsBulkSubmitting(false);
+    }
   };
 
   // Preset product names extracted dynamically from products
@@ -1348,9 +1548,25 @@ export default function Inventory({
                   <div className="p-5 bg-slate-50/50 border-t border-slate-100 space-y-4">
                     {/* Colors Horizontal selector */}
                     <div className="space-y-1.5">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        {language === 'en' ? 'Select Color / Shade' : 'வண்ணத்தைத் தேர்ந்தெடுக்கவும்'}
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          {language === 'en' ? 'Select Color / Shade' : 'வண்ணத்தைத் தேர்ந்தெடுக்கவும்'}
+                        </p>
+                        {userRole === 'admin' && selectedColor && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openBulkColorEditModal(g, selectedColor);
+                            }}
+                            className="text-[10px] font-black text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-md flex items-center gap-1 transition-all cursor-pointer shadow-3xs"
+                            title={language === 'en' ? `Edit all sizes of ${selectedColor} together` : `${selectedColor} வண்ணத்தின் அனைத்து அளவுகளையும் எடிட் செய்`}
+                          >
+                            <Edit3 className="h-3 w-3" />
+                            <span>{language === 'en' ? `Edit ${selectedColor} Group` : `${selectedColor} குழுவை எடிட் செய்`}</span>
+                          </button>
+                        )}
+                      </div>
                       <div className="flex gap-2 flex-wrap">
                         {colorsList.map((colName) => {
                           const isColSelected = selectedColor === colName;
@@ -1590,7 +1806,8 @@ export default function Inventory({
                     required
                     value={prodName}
                     onChange={(e) => setProdName(e.target.value.toUpperCase())}
-                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase"
+                    disabled={!!editingProduct}
+                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed font-bold"
                     placeholder={language === 'en' ? "e.g. T-SHIRT" : "எ.கா. டீ-சர்ட்"}
                     list="form-names-list"
                   />
@@ -1608,7 +1825,8 @@ export default function Inventory({
                     required
                     value={prodCategory}
                     onChange={(e) => setProdCategory(e.target.value.toUpperCase())}
-                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase"
+                    disabled={!!editingProduct}
+                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     placeholder="e.g. SHIRTS, PANTS, COTTON ROLL"
                     list="form-categories-list"
                   />
@@ -1625,7 +1843,8 @@ export default function Inventory({
                     type="text"
                     value={prodMaterial}
                     onChange={(e) => setProdMaterial(e.target.value.toUpperCase())}
-                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase"
+                    disabled={!!editingProduct}
+                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     placeholder="e.g. COTTON, POLYESTER, SILK"
                     list="form-materials-list"
                   />
@@ -1642,7 +1861,8 @@ export default function Inventory({
                     type="text"
                     value={prodGsm}
                     onChange={(e) => setProdGsm(e.target.value.toUpperCase())}
-                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase"
+                    disabled={!!editingProduct}
+                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     placeholder="e.g. 180 GSM, 220 GSM"
                     list="form-gsms-list"
                   />
@@ -1659,7 +1879,7 @@ export default function Inventory({
                     type="text"
                     value={prodColor}
                     onChange={(e) => setProdColor(e.target.value.toUpperCase())}
-                    disabled={!!editingProduct && userRole !== 'admin'}
+                    disabled={!!editingProduct}
                     className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     placeholder="e.g. RED, BLUE, BLACK"
                     list="form-colors-list"
@@ -1750,7 +1970,7 @@ export default function Inventory({
                         type="text"
                         value={prodSize}
                         onChange={(e) => setProdSize(e.target.value.toUpperCase())}
-                        disabled={userRole !== 'admin'}
+                        disabled={!!editingProduct}
                         className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm uppercase disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                         placeholder="e.g. M, L, XL, XXL, 32"
                       />
@@ -1763,7 +1983,7 @@ export default function Inventory({
                         min="0"
                         value={prodQuantity}
                         onChange={(e) => setProdQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-                        disabled={userRole !== 'admin'}
+                        disabled={!!editingProduct}
                         className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -1867,7 +2087,8 @@ export default function Inventory({
                     min="0"
                     value={prodMinStock}
                     onChange={(e) => setProdMinStock(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm"
+                    disabled={!!editingProduct}
+                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -1880,7 +2101,8 @@ export default function Inventory({
                     required
                     value={prodSellingPrice}
                     onChange={(e) => setProdSellingPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm"
+                    disabled={!!editingProduct}
+                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed font-bold text-slate-900"
                   />
                 </div>
 
@@ -1893,7 +2115,8 @@ export default function Inventory({
                     required
                     value={prodPurchasePrice}
                     onChange={(e) => setProdPurchasePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm"
+                    disabled={!!editingProduct}
+                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -1905,7 +2128,8 @@ export default function Inventory({
                     min="0"
                     value={prodMaxDiscount}
                     onChange={(e) => setProdMaxDiscount(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm"
+                    disabled={!!editingProduct}
+                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     placeholder="₹"
                   />
                 </div>
@@ -1915,7 +2139,8 @@ export default function Inventory({
                   <select
                     value={prodUnit}
                     onChange={(e) => setProdUnit(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm"
+                    disabled={!!editingProduct}
+                    className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-xs text-sm disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   >
                     <option value="pcs">{language === 'en' ? 'Pcs (Pieces)' : 'பீஸ் (Pcs)'}</option>
                     <option value="set">{language === 'en' ? 'Set' : 'செட் (Set)'}</option>
@@ -1973,77 +2198,85 @@ export default function Inventory({
                           )
                         )}
                         
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProdImageUrl('');
-                            setCompressionInfo(null);
-                          }}
-                          className="text-red-600 hover:text-red-700 text-xs font-bold mt-1 inline-flex items-center gap-1 cursor-pointer"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          {language === 'en' ? 'Remove Image' : 'படத்தை நீக்கு'}
-                        </button>
+                        {!editingProduct && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProdImageUrl('');
+                              setCompressionInfo(null);
+                            }}
+                            className="text-red-600 hover:text-red-700 text-xs font-bold mt-1 inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            {language === 'en' ? 'Remove Image' : 'படத்தை நீக்கு'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {/* File Upload zone (Drag-and-drop or click) */}
-                      <div 
-                        onClick={() => {
-                          const fileInput = document.getElementById('prod-image-file') as HTMLInputElement;
-                          fileInput?.click();
-                        }}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          const file = e.dataTransfer.files?.[0];
-                          if (file && file.type.startsWith('image/')) {
-                            processAndCompressImageFile(file);
-                          }
-                        }}
-                        className="border-2 border-dashed border-slate-300 hover:border-slate-400 rounded-xl p-4 text-center cursor-pointer hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-1 bg-white min-h-[90px]"
-                      >
-                        <Plus className="h-5 w-5 text-slate-400" />
-                        <span className="text-[11px] font-bold text-slate-600">
-                          {language === 'en' ? 'Upload Image' : 'படம் பதிவேற்று'}
-                        </span>
-                        <span className="text-[9px] text-slate-400">
-                          {language === 'en' ? 'Drag & Drop or Click (Auto-compressed)' : 'இழுத்து விடவும் அல்லது கிளிக் செய்யவும்'}
-                        </span>
-                        <input 
-                          id="prod-image-file"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
+                    editingProduct ? (
+                      <div className="border border-slate-200 rounded-xl p-4 text-center bg-slate-50 text-slate-400 text-xs font-semibold">
+                        {language === 'en' ? 'No Image Uploaded' : 'படம் எதுவும் பதிவேற்றப்படவில்லை'}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* File Upload zone (Drag-and-drop or click) */}
+                        <div 
+                          onClick={() => {
+                            const fileInput = document.getElementById('prod-image-file') as HTMLInputElement;
+                            fileInput?.click();
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const file = e.dataTransfer.files?.[0];
+                            if (file && file.type.startsWith('image/')) {
                               processAndCompressImageFile(file);
                             }
                           }}
-                        />
-                      </div>
+                          className="border-2 border-dashed border-slate-300 hover:border-slate-400 rounded-xl p-4 text-center cursor-pointer hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-1 bg-white min-h-[90px]"
+                        >
+                          <Plus className="h-5 w-5 text-slate-400" />
+                          <span className="text-[11px] font-bold text-slate-600">
+                            {language === 'en' ? 'Upload Image' : 'படம் பதிவேற்று'}
+                          </span>
+                          <span className="text-[9px] text-slate-400">
+                            {language === 'en' ? 'Drag & Drop or Click (Auto-compressed)' : 'இழுத்து விடவும் அல்லது கிளிக் செய்யவும்'}
+                          </span>
+                          <input 
+                            id="prod-image-file"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                processAndCompressImageFile(file);
+                              }
+                            }}
+                          />
+                        </div>
 
-                      {/* URL Input fallback */}
-                      <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 flex flex-col justify-center gap-2">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                          {language === 'en' ? 'Or Paste Image URL' : 'அல்லது பட முகவரியை ஒட்டவும்'}
-                        </span>
-                        <input 
-                          type="url"
-                          value={prodImageUrl}
-                          onChange={(e) => {
-                            setProdImageUrl(e.target.value);
-                            setCompressionInfo(null); // No local file info for pasted URL
-                          }}
-                          placeholder="https://example.com/image.jpg"
-                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
+                        {/* URL Input fallback */}
+                        <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 flex flex-col justify-center gap-2">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                            {language === 'en' ? 'Or Paste Image URL' : 'அல்லது பட முகவரியை ஒட்டவும்'}
+                          </span>
+                          <input 
+                            type="url"
+                            value={prodImageUrl}
+                            onChange={(e) => {
+                              setProdImageUrl(e.target.value);
+                              setCompressionInfo(null); // No local file info for pasted URL
+                            }}
+                            placeholder="https://example.com/image.jpg"
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )
                   )}
                 </div>
               </div>
@@ -2063,6 +2296,376 @@ export default function Inventory({
                   className="px-5 py-2 bg-slate-900 text-white hover:bg-slate-800 rounded-lg text-xs font-black shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isSubmitting ? (
+                    <>
+                      <span className="inline-block animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></span>
+                      {language === 'en' ? 'Saving...' : 'சேமிக்கிறது...'}
+                    </>
+                  ) : (
+                    t.save
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* --- MODAL: BULK EDIT COLOR GROUP --- */}
+      {showBulkColorModal && bulkColorGroup && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden max-h-[92vh] flex flex-col border border-slate-100">
+            {/* Header */}
+            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shadow-md shrink-0">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <Edit3 className="h-5 w-5 text-amber-400" />
+                <span>
+                  {language === 'en' 
+                    ? `Edit Color Group: ${bulkColorName} - ${bulkProdName}` 
+                    : `வண்ணக் குழு எடிட்: ${bulkColorName} - ${bulkProdName}`}
+                </span>
+              </h3>
+              <button 
+                onClick={() => setShowBulkColorModal(false)} 
+                className="text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleBulkColorSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Part 1: Shared Product Information */}
+              <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 space-y-4">
+                <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-wider">
+                  {language === 'en' ? 'Shared Details (Applies to all sizes)' : 'பொதுவான விவரங்கள் (அனைத்து அளவுகளுக்கும் பொருந்தும்)'}
+                </h4>
+                
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">{t.productName} *</label>
+                    <input
+                      type="text"
+                      required
+                      value={bulkProdName}
+                      onChange={(e) => setBulkProdName(e.target.value.toUpperCase())}
+                      className="mt-1 block w-full px-3 py-1.5 border border-slate-300 rounded-lg shadow-xs text-xs uppercase focus:ring-1 focus:ring-blue-500 bg-white font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">{t.category}</label>
+                    <input
+                      type="text"
+                      value={bulkProdCategory}
+                      onChange={(e) => setBulkProdCategory(e.target.value.toUpperCase())}
+                      className="mt-1 block w-full px-3 py-1.5 border border-slate-300 rounded-lg shadow-xs text-xs uppercase focus:ring-1 focus:ring-blue-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">{t.color} Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={bulkColorName}
+                      onChange={(e) => setBulkColorName(e.target.value.toUpperCase())}
+                      className="mt-1 block w-full px-3 py-1.5 border border-slate-300 rounded-lg shadow-xs text-xs uppercase font-bold text-amber-700 bg-amber-50/40 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">{t.material}</label>
+                    <input
+                      type="text"
+                      value={bulkProdMaterial}
+                      onChange={(e) => setBulkProdMaterial(e.target.value.toUpperCase())}
+                      className="mt-1 block w-full px-3 py-1.5 border border-slate-300 rounded-lg shadow-xs text-xs uppercase focus:ring-1 focus:ring-blue-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">{t.gsm}</label>
+                    <input
+                      type="text"
+                      value={bulkProdGsm}
+                      onChange={(e) => setBulkProdGsm(e.target.value.toUpperCase())}
+                      className="mt-1 block w-full px-3 py-1.5 border border-slate-300 rounded-lg shadow-xs text-xs uppercase focus:ring-1 focus:ring-blue-500 bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Shared Image for this Color */}
+                <div className="border-t border-slate-200 pt-3">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    {language === 'en' ? 'Color Specific Image' : 'வண்ணத் தயாரிப்பு படம்'}
+                  </label>
+                  
+                  {bulkProdImageUrl ? (
+                    <div className="relative border border-slate-200 rounded-xl p-3 bg-white flex items-start gap-4">
+                      <img 
+                        src={bulkProdImageUrl} 
+                        alt="Product Preview" 
+                        className="w-16 h-16 object-cover rounded-lg border border-slate-200 bg-white shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="flex-1 space-y-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                          <p className="text-xs font-bold text-slate-700 truncate">
+                            {language === 'en' ? 'Image Selected' : 'படம் தேர்ந்தெடுக்கப்பட்டது'}
+                          </p>
+                        </div>
+                        
+                        {bulkCompressionInfo && (
+                          <div className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 inline-block">
+                            {language === 'en' ? `Compressed: ${bulkCompressionInfo.compressedSize} (Saved ${bulkCompressionInfo.ratio})` : `சுருக்கப்பட்டது: ${bulkCompressionInfo.compressedSize}`}
+                          </div>
+                        )}
+                        
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBulkProdImageUrl('');
+                              setBulkCompressionInfo(null);
+                            }}
+                            className="text-red-600 hover:text-red-700 text-xs font-bold mt-1 inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            {language === 'en' ? 'Remove Image' : 'படத்தை நீக்கு'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div 
+                        onClick={() => {
+                          const fileInput = document.getElementById('bulk-prod-image-file') as HTMLInputElement;
+                          fileInput?.click();
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files?.[0];
+                          if (file && file.type.startsWith('image/')) {
+                            processAndCompressBulkImageFile(file);
+                          }
+                        }}
+                        className="border-2 border-dashed border-slate-300 hover:border-slate-400 rounded-xl p-4 text-center cursor-pointer hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-1 bg-white min-h-[85px]"
+                      >
+                        <Plus className="h-4 w-4 text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-600">
+                          {language === 'en' ? 'Upload Image for this Color' : 'இந்த வண்ணத்திற்கு படம் பதிவேற்று'}
+                        </span>
+                        <input 
+                          id="bulk-prod-image-file"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              processAndCompressBulkImageFile(file);
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <div className="border border-slate-200 rounded-xl p-3 bg-white flex flex-col justify-center gap-1.5">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                          {language === 'en' ? 'Or Paste Image URL' : 'அல்லது பட முகவரியை ஒட்டவும்'}
+                        </span>
+                        <input 
+                          type="url"
+                          value={bulkProdImageUrl}
+                          onChange={(e) => {
+                            setBulkProdImageUrl(e.target.value);
+                            setBulkCompressionInfo(null);
+                          }}
+                          placeholder="https://example.com/image.jpg"
+                          className="w-full px-2.5 py-1 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Part 2: Dynamic Sizes List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-wider">
+                    {language === 'en' ? 'Size-wise Stock & Pricing' : 'அளவுகள் வாரியாக இருப்பு மற்றும் விலை'}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleAddBulkSizeRow}
+                    className="px-3 py-1 rounded-lg text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    <span>{language === 'en' ? 'Add Size Row' : 'அளவு வரிசையைச் சேர்'}</span>
+                  </button>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-150 text-xs text-slate-700">
+                      <thead>
+                        <tr className="bg-slate-50 font-bold text-slate-500">
+                          <th className="px-4 py-2 text-left">{language === 'en' ? 'Size *' : 'அளவு *'}</th>
+                          <th className="px-4 py-2 text-center w-28">{language === 'en' ? 'Stock Qty' : 'இருப்பு அளவு'}</th>
+                          <th className="px-4 py-2 text-right w-32">{t.sellingPrice}</th>
+                          <th className="px-4 py-2 text-right w-32">{t.manufacturingCost}</th>
+                          <th className="px-4 py-2 text-right w-28">{t.maxDiscount}</th>
+                          <th className="px-4 py-2 text-center w-24">{language === 'en' ? 'Min Stock' : 'குறைந்தபட்ச இருப்பு'}</th>
+                          <th className="px-4 py-2 text-center w-12"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-semibold">
+                        {bulkSizesList.map((row, index) => {
+                          const handleRowChange = (field: string, val: any) => {
+                            setBulkSizesList(prev => prev.map((item, idx) => {
+                              if (idx === index) {
+                                return { ...item, [field]: val };
+                              }
+                              return item;
+                            }));
+                          };
+
+                          const handleRemoveRow = () => {
+                            if (row.id) {
+                              if (window.confirm(language === 'en' ? `Are you sure you want to delete SKU ${row.sku} entirely?` : `நிச்சயமாக SKU ${row.sku} ஐ முழுமையாக அழிக்க வேண்டுமா?`)) {
+                                onDeleteProduct(row.id)
+                                  .then(() => {
+                                    setBulkSizesList(prev => prev.filter((_, idx) => idx !== index));
+                                    triggerFeedback('success', language === 'en' ? 'Variant deleted!' : 'அளவு நீக்கப்பட்டது!');
+                                  })
+                                  .catch(err => {
+                                    console.error(err);
+                                    triggerFeedback('error', language === 'en' ? 'Delete failed.' : 'அழிக்க முடியவில்லை.');
+                                  });
+                              }
+                            } else {
+                              setBulkSizesList(prev => prev.filter((_, idx) => idx !== index));
+                            }
+                          };
+
+                          return (
+                            <tr key={row.sku} className="hover:bg-slate-50/50">
+                              {/* Size Name */}
+                              <td className="px-4 py-2">
+                                <input
+                                  type="text"
+                                  required
+                                  value={row.sizeName}
+                                  onChange={(e) => handleRowChange('sizeName', e.target.value.toUpperCase())}
+                                  placeholder="e.g. XL"
+                                  className="w-full px-2 py-1 border border-slate-300 rounded-md uppercase text-center font-extrabold text-xs text-slate-800 bg-white"
+                                />
+                              </td>
+
+                              {/* Quantity */}
+                              <td className="px-4 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  required
+                                  value={row.quantity}
+                                  onChange={(e) => handleRowChange('quantity', Math.max(0, Number(e.target.value)))}
+                                  className="w-20 px-2 py-1 border border-slate-300 rounded-md text-center font-bold text-xs text-slate-800 bg-white"
+                                />
+                              </td>
+
+                              {/* Selling Price */}
+                              <td className="px-4 py-2">
+                                <div className="relative">
+                                  <span className="absolute left-1.5 top-1.5 text-slate-400 font-bold text-[10px]">₹</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={row.sellingPrice === 0 || row.sellingPrice === '' ? '' : row.sellingPrice}
+                                    onChange={(e) => handleRowChange('sellingPrice', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                                    className="w-full pl-4 pr-1 py-1 border border-slate-300 rounded-md text-right font-bold text-xs text-slate-800 bg-white"
+                                  />
+                                </div>
+                              </td>
+
+                              {/* Purchase Cost */}
+                              <td className="px-4 py-2">
+                                <div className="relative">
+                                  <span className="absolute left-1.5 top-1.5 text-slate-400 font-bold text-[10px]">₹</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={row.purchasePrice === 0 || row.purchasePrice === '' ? '' : row.purchasePrice}
+                                    onChange={(e) => handleRowChange('purchasePrice', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                                    className="w-full pl-4 pr-1 py-1 border border-slate-300 rounded-md text-right font-bold text-xs text-slate-800 bg-white"
+                                  />
+                                </div>
+                              </td>
+
+                              {/* Max Discount */}
+                              <td className="px-4 py-2">
+                                <div className="relative">
+                                  <span className="absolute left-1.5 top-1.5 text-slate-400 font-bold text-[10px]">₹</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={row.maxDiscount === 0 || row.maxDiscount === '' ? '' : row.maxDiscount}
+                                    onChange={(e) => handleRowChange('maxDiscount', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                                    className="w-full pl-4 pr-1 py-1 border border-slate-300 rounded-md text-right font-semibold text-xs text-slate-800 bg-white"
+                                  />
+                                </div>
+                              </td>
+
+                              {/* Min Stock */}
+                              <td className="px-4 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  required
+                                  value={row.minStock}
+                                  onChange={(e) => handleRowChange('minStock', Math.max(0, Number(e.target.value)))}
+                                  className="w-16 px-2 py-1 border border-slate-300 rounded-md text-center font-semibold text-xs text-slate-800 bg-white"
+                                />
+                              </td>
+
+                              {/* Delete Action */}
+                              <td className="px-4 py-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveRow}
+                                  className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                  title={language === 'en' ? 'Delete row' : 'வரிசையை நீக்கு'}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkColorModal(false)}
+                  className="px-5 py-2 border border-slate-250 hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-lg text-xs font-bold cursor-pointer transition-all"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isBulkSubmitting}
+                  className="px-5 py-2 bg-slate-900 text-white hover:bg-slate-800 rounded-lg text-xs font-black shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isBulkSubmitting ? (
                     <>
                       <span className="inline-block animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></span>
                       {language === 'en' ? 'Saving...' : 'சேமிக்கிறது...'}
