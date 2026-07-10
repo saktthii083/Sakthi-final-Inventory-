@@ -445,6 +445,61 @@ export default function App() {
     }
   }, [user, authInitializing]);
 
+  // Automatic cleanup of duplicate initial-stock/bulk-import-new transactions
+  useEffect(() => {
+    if (!user || transactions.length === 0) return;
+
+    const cleanupDuplicates = async () => {
+      const duplicateIdsToDelete: string[] = [];
+      
+      // Group transactions by SKU
+      const txsBySku: { [sku: string]: Transaction[] } = {};
+      transactions.forEach(tx => {
+        if (tx.sku) {
+          const skuUpper = tx.sku.toUpperCase();
+          if (!txsBySku[skuUpper]) {
+            txsBySku[skuUpper] = [];
+          }
+          txsBySku[skuUpper].push(tx);
+        }
+      });
+
+      // For each SKU, find duplicates
+      Object.keys(txsBySku).forEach(sku => {
+        const list = txsBySku[sku];
+        // We look for t1 with referenceNo 'INITIAL STOCK ADDED'
+        const initialStockAddedTx = list.find(t => t.referenceNo === 'INITIAL STOCK ADDED');
+        if (initialStockAddedTx) {
+          // Find any other initial inward transactions that might be duplicates
+          list.forEach(t => {
+            if (t.id && t.id !== initialStockAddedTx.id) {
+              if (t.referenceNo === 'INITIAL-STOCK' || t.referenceNo === 'INITIAL-STOCK-ADDED' || t.referenceNo === 'BULK-IMPORT-NEW') {
+                duplicateIdsToDelete.push(t.id);
+              }
+            }
+          });
+        }
+      });
+
+      if (duplicateIdsToDelete.length > 0) {
+        console.log("Cleaning up duplicate transactions:", duplicateIdsToDelete);
+        for (const id of duplicateIdsToDelete) {
+          try {
+            await deleteDoc(doc(db, 'transactions', id));
+          } catch (err) {
+            console.error("Error deleting duplicate transaction:", id, err);
+          }
+        }
+      }
+    };
+
+    const timer = setTimeout(() => {
+      cleanupDuplicates();
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [transactions, user]);
+
   // Seed default items into user's Firestore collection to prevent empty board
   const seedFirestoreProducts = async (uId: string) => {
     try {
