@@ -19,7 +19,7 @@ export default function SystemLedger({
   onDeleteTransaction,
   onClearTransactions
 }: SystemLedgerProps) {
-  const [ledgerTypeFilter, setLedgerTypeFilter] = React.useState<'all' | 'sales' | 'inward' | 'restock' | 'deleted'>('all');
+  const [ledgerTypeFilter, setLedgerTypeFilter] = React.useState<'all' | 'sales' | 'inward' | 'restock' | 'deleted' | 'edited'>('all');
   const [ledgerSearch, setLedgerSearch] = React.useState('');
   const [startDate, setStartDate] = React.useState<string>('');
   const [endDate, setEndDate] = React.useState<string>('');
@@ -95,7 +95,7 @@ export default function SystemLedger({
 
   // Export Modal states
   const [showExportDialog, setShowExportDialog] = React.useState(false);
-  const [exportType, setExportType] = React.useState<'sales' | 'inward' | 'stock' | 'all' | 'restock' | 'deleted'>('all');
+  const [exportType, setExportType] = React.useState<'sales' | 'inward' | 'stock' | 'all' | 'restock' | 'deleted' | 'edited'>('all');
   const [exportStartDate, setExportStartDate] = React.useState<string>('');
   const [exportEndDate, setExportEndDate] = React.useState<string>('');
 
@@ -331,10 +331,10 @@ export default function SystemLedger({
       {/* Toolbar & Filter Tabs */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Filter Tabs */}
-        <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 self-start">
+        <div className="flex flex-wrap md:flex-nowrap w-full md:w-auto bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1 md:gap-0 self-start">
           <button
             onClick={() => setLedgerTypeFilter('all')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex-1 md:flex-none text-center px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
               ledgerTypeFilter === 'all' 
                 ? 'bg-white text-slate-900 shadow-sm' 
                 : 'text-slate-500 hover:text-slate-800'
@@ -344,7 +344,7 @@ export default function SystemLedger({
           </button>
           <button
             onClick={() => setLedgerTypeFilter('sales')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex-1 md:flex-none text-center px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
               ledgerTypeFilter === 'sales' 
                 ? 'bg-emerald-500 text-white shadow-sm' 
                 : 'text-slate-500 hover:text-slate-800'
@@ -354,7 +354,7 @@ export default function SystemLedger({
           </button>
           <button
             onClick={() => setLedgerTypeFilter('inward')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex-1 md:flex-none text-center px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
               ledgerTypeFilter === 'inward' 
                 ? 'bg-blue-600 text-white shadow-sm' 
                 : 'text-slate-500 hover:text-slate-800'
@@ -364,7 +364,7 @@ export default function SystemLedger({
           </button>
           <button
             onClick={() => setLedgerTypeFilter('restock')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex-1 md:flex-none text-center px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
               ledgerTypeFilter === 'restock' 
                 ? 'bg-amber-500 text-white shadow-sm' 
                 : 'text-slate-500 hover:text-slate-800'
@@ -374,13 +374,23 @@ export default function SystemLedger({
           </button>
           <button
             onClick={() => setLedgerTypeFilter('deleted')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex-1 md:flex-none text-center px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
               ledgerTypeFilter === 'deleted' 
                 ? 'bg-red-500 text-white shadow-sm' 
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             {language === 'en' ? 'Deleted' : 'அழிக்கப்பட்டது'}
+          </button>
+          <button
+            onClick={() => setLedgerTypeFilter('edited')}
+            className={`flex-1 md:flex-none text-center px-3 py-1.5 text-xs font-bold rounded-md uppercase tracking-wider transition-all cursor-pointer ${
+              ledgerTypeFilter === 'edited' 
+                ? 'bg-purple-600 text-white shadow-sm' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {language === 'en' ? 'Edited' : 'தொகுக்கப்பட்டது'}
           </button>
         </div>
 
@@ -545,6 +555,10 @@ export default function SystemLedger({
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-red-50 text-red-700 border border-red-100">
                           {language === 'en' ? 'Deleted' : 'அழிக்கப்பட்டது'}
                         </span>
+                      ) : tx.type === 'edited' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-100">
+                          {language === 'en' ? 'Edited' : 'தொகுக்கப்பட்டது'}
+                        </span>
                       ) : tx.type === 'inward' && tx.referenceNo === 'RESTOCK' ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-100">
                           {language === 'en' ? 'Restock' : 'ரீஸ்டாக்'}
@@ -568,9 +582,9 @@ export default function SystemLedger({
                     <td className="p-4 whitespace-nowrap text-right font-black text-slate-900 text-sm">
                       {formatCurrency(tx.total)}
                     </td>
-                    <td className="p-4 whitespace-nowrap">
-                      <div className="font-mono text-[10px] text-slate-600 font-bold">{tx.referenceNo}</div>
-                      <div className="text-[9px] text-slate-400 mt-0.5 truncate max-w-[150px]">{tx.counterParty || '-'}</div>
+                    <td className="p-4 max-w-[300px]">
+                      <div className="font-mono text-[10px] text-slate-600 font-bold break-words whitespace-pre-wrap">{tx.referenceNo}</div>
+                      <div className="text-[9px] text-slate-400 mt-0.5 truncate max-w-[200px]">{tx.counterParty || '-'}</div>
                     </td>
                     <td className="p-4 whitespace-nowrap text-[10px] text-slate-500 font-medium">
                       {tx.createdByEmail || 'Admin/System'}

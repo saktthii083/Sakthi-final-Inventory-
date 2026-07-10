@@ -478,11 +478,67 @@ export default function App() {
   const handleEditProduct = async (id: string, prodData: Partial<Product>) => {
     if (user) {
       try {
+        const original = products.find(p => p.id === id);
+
         const docRef = doc(db, 'products', id);
         await updateDoc(docRef, {
           ...prodData,
           updatedAt: new Date().toISOString()
         });
+
+        if (original) {
+          const changes: string[] = [];
+          const keysToTrack: (keyof Product)[] = [
+            'name', 'sku', 'category', 'quantity', 'sellingPrice', 'purchasePrice',
+            'material', 'gsm', 'color', 'size', 'maxDiscount'
+          ];
+          keysToTrack.forEach(key => {
+            if (prodData[key] !== undefined && prodData[key] !== original[key]) {
+              const labelEn = key === 'name' ? 'Name'
+                            : key === 'sku' ? 'SKU'
+                            : key === 'category' ? 'Category'
+                            : key === 'quantity' ? 'Qty'
+                            : key === 'sellingPrice' ? 'Selling Price'
+                            : key === 'purchasePrice' ? 'Purchase Price'
+                            : key === 'material' ? 'Material'
+                            : key === 'gsm' ? 'GSM'
+                            : key === 'color' ? 'Color'
+                            : key === 'size' ? 'Size'
+                            : key === 'maxDiscount' ? 'Max Discount'
+                            : key;
+
+              const labelTa = key === 'name' ? 'பெயர்'
+                            : key === 'sku' ? 'SKU'
+                            : key === 'category' ? 'பிரிவு'
+                            : key === 'quantity' ? 'அளவு'
+                            : key === 'sellingPrice' ? 'விற்பனை விலை'
+                            : key === 'purchasePrice' ? 'கொள்முதல் விலை'
+                            : key === 'material' ? 'பொருள்'
+                            : key === 'gsm' ? 'ஜிஎஸ்எம்'
+                            : key === 'color' ? 'வண்ணம்'
+                            : key === 'size' ? 'அளவு (Size)'
+                            : key === 'maxDiscount' ? 'அதிகபட்ச தள்ளுபடி'
+                            : key;
+
+              changes.push(`${labelEn}/${labelTa}: ${original[key] ?? 'N/A'} -> ${prodData[key]}`);
+            }
+          });
+
+          if (changes.length > 0) {
+            await handleAddTransaction({
+              type: 'edited',
+              sku: prodData.sku || original.sku || '',
+              productName: prodData.name || original.name || '',
+              quantity: prodData.quantity !== undefined ? (Number(prodData.quantity) - Number(original.quantity || 0)) : 0,
+              price: prodData.sellingPrice !== undefined ? Number(prodData.sellingPrice) : Number(original.sellingPrice || 0),
+              total: 0,
+              referenceNo: changes.join(', '),
+              counterParty: 'PRODUCT EDIT',
+              paymentMethod: 'System',
+              date: new Date().toISOString()
+            });
+          }
+        }
       } catch (err) {
         handleFirestoreError(err, OperationType.UPDATE, `products/${id}`);
       }

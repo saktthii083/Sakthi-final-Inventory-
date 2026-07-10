@@ -137,12 +137,13 @@ export default function Billing({
       return 'Cash';
     }
   });
-  const [discountAmount, setDiscountAmount] = React.useState(() => {
+  const [discountAmount, setDiscountAmount] = React.useState<number | ''>(() => {
     try {
       const saved = localStorage.getItem('inventory_billing_draft_discountAmount');
-      return saved ? Number(saved) : 0;
+      if (saved === '') return '';
+      return saved ? Number(saved) : '';
     } catch {
-      return 0;
+      return '';
     }
   });
   const [includeGst, setIncludeGst] = React.useState(() => {
@@ -365,7 +366,7 @@ export default function Billing({
     setCart([]);
     setCustomerName('');
     setCustomerPhone('');
-    setDiscountAmount(0);
+    setDiscountAmount('');
     setIncludeGst(false);
     setShowTaxFields(false);
     setCustomerGst('');
@@ -1117,8 +1118,9 @@ export default function Billing({
                   <input
                     type="number"
                     min="0"
-                    value={discountAmount}
-                    onChange={(e) => setDiscountAmount(Math.max(0, Number(e.target.value)))}
+                    placeholder="0"
+                    value={discountAmount === 0 ? '' : discountAmount}
+                    onChange={(e) => setDiscountAmount(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
                     className="block w-full h-[50px] bg-slate-50 border border-slate-200 rounded-lg p-2 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>

@@ -31,7 +31,7 @@ export interface UserProfile {
 
 export interface Transaction {
   id?: string;
-  type: 'inward' | 'sales' | 'deleted';
+  type: 'inward' | 'sales' | 'deleted' | 'edited';
   sku: string;
   productName: string;
   quantity: number;
