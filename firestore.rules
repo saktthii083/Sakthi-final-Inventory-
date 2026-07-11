@@ -19,7 +19,7 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.uid == "bd0jbxr3P0aaiOB5ou6EwiZnhq43" ||
         ("email" in request.auth.token && request.auth.token.email.lower() == "sakthibala72@gmail.com") ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
       );
     }
@@ -101,33 +101,63 @@ service cloud.firestore {
     // --- Collection Security Rules ---
 
     // Users Collection
+    // - Anyone signed in can read the directory (needed for admin UI + role checks).
+    // - A user can create/update their OWN profile, but cannot change their own `role` field.
+    // - Only an admin can change roles or delete a user profile.
     match /users/{userId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+
+      allow create: if isOwner(userId);
+
+      allow update: if isAdmin()
+        || (isOwner(userId) && incoming().role == existing().role);
+
+      allow delete: if isAdmin();
     }
 
     // Products Collection
+    // - Any signed-in staff member can view/add/edit stock.
+    // - Only an admin can delete a product (matches the app's UI, where delete is admin-only).
     match /products/{productId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidProduct(incoming());
+      allow delete: if isAdmin();
     }
 
     // Transactions Collection (Stock Ledger)
+    // - Any signed-in staff member can log inward/sales transactions.
+    // - Only an admin can delete a transaction record (audit trail protection).
     match /transactions/{transactionId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidTransaction(incoming());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Bills Collection
+    // - Any signed-in staff member can create a bill.
+    // - Only an admin can delete a bill.
     match /bills/{billId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidBill(incoming());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Files Collection
     match /files/{fileId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidFile(incoming());
+      allow update, delete: if isAdmin();
     }
-    
+
     // Company Settings Collection
+    // - Any signed-in staff can view company details (needed to print bills etc.)
+    // - Only an admin can change company settings.
     match /company/{companyId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isValidCompany(incoming());
     }
   }
 }
+

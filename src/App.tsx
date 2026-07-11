@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs, getDoc, setDoc 
+  collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs, getDoc, setDoc, orderBy, limit, getAggregateFromServer, sum 
 } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { motion, AnimatePresence } from 'motion/react';
@@ -85,6 +85,7 @@ const SEED_PRODUCTS = [
 ];
 
 export default function App() {
+  const mainSyncUnsubs = useRef<(() => void)[]>([]);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [language, setLanguage] = useState<Language>(() => {
     const saved = localStorage.getItem('app_language');
@@ -138,6 +139,7 @@ export default function App() {
     }
     return 1.0;
   });
+  const [totalSalesAggregate, setTotalSalesAggregate] = useState<number>(0);
 
   const t = translations[language];
 
@@ -227,6 +229,9 @@ export default function App() {
         const errMsg = err instanceof Error ? err.message : String(err);
         if (errMsg.includes('offline') || errMsg.includes('unavailable') || errMsg.includes('network')) {
           console.warn("Firestore is offline, falling back to local user role:", errMsg);
+        } else if (errMsg.includes('Quota') || errMsg.includes('quota')) {
+          console.warn("Firestore quota exceeded, falling back to local user role:", errMsg);
+          setSyncError("Firebase Daily Quota Exceeded. The database has reached its free tier limit and will reset tomorrow.");
         } else {
           console.error("Failed to fetch/save user profile role from backend:", err);
         }
@@ -253,11 +258,17 @@ export default function App() {
       });
       setUsersList(list);
     }, (error) => {
-      console.error("Failed to sync registered users:", error);
+      const msg = error.message || String(error);
+      if (msg.includes('Quota') || msg.includes('quota')) {
+        console.warn("Firestore quota exceeded, failed to sync registered users.");
+        setSyncError("Firebase Daily Quota Exceeded. The database has reached its free tier limit and will reset tomorrow.");
+      } else {
+        console.error("Failed to sync registered users:", error);
+      }
     });
 
     return () => unsub();
-  }, [user, userRole]);
+  }, [user?.uid, userRole]);
 
   const handleUpdateUserRole = async (targetUid: string, newRole: 'admin' | 'user') => {
     try {
@@ -356,17 +367,114 @@ export default function App() {
     }
   };
 
+  const handleForceRefresh = async () => {
+    if (!user?.uid) return;
+    setAppReady(false);
+    setSyncError(null);
+    const uId = 'bd0jbxr3P0aaiOB5ou6EwiZnhq43';
+
+    try {
+      // Force fetch products
+      const prodQuery = query(collection(db, 'products'), where('userId', '==', uId));
+      const prodSnap = await getDocs(prodQuery);
+      const fetchedProds: Product[] = [];
+      prodSnap.forEach(docSnap => fetchedProds.push({ id: docSnap.id, ...docSnap.data() } as Product));
+      setProducts(fetchedProds);
+
+      // Force fetch transactions
+      const txQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(150));
+      const txSnap = await getDocs(txQuery);
+      const fetchedTxs: Transaction[] = [];
+      txSnap.forEach(docSnap => fetchedTxs.push({ id: docSnap.id, ...docSnap.data() } as Transaction));
+      
+      const txsBySku: { [sku: string]: Transaction[] } = {};
+      fetchedTxs.forEach(tx => {
+        if (tx.sku) {
+          const skuUpper = tx.sku.toUpperCase();
+          if (!txsBySku[skuUpper]) txsBySku[skuUpper] = [];
+          txsBySku[skuUpper].push(tx);
+        }
+      });
+      const duplicateIdsToHide = new Set<string>();
+      Object.keys(txsBySku).forEach(sku => {
+        const list = txsBySku[sku];
+        const hasAdminInitial = list.find(t => t.referenceNo === 'INITIAL STOCK ADDED');
+        if (hasAdminInitial) {
+          list.forEach(t => {
+            if (t.id !== hasAdminInitial.id && (t.referenceNo === 'INITIAL-STOCK' || t.referenceNo === 'INITIAL-STOCK-ADDED' || t.referenceNo === 'BULK-IMPORT-NEW')) {
+              duplicateIdsToHide.add(t.id!);
+            }
+          });
+        }
+      });
+      const cleanedTxs = fetchedTxs.filter(tx => !duplicateIdsToHide.has(tx.id!));
+      setTransactions(cleanedTxs);
+
+      const aggQuery = query(collection(db, 'transactions'), where('userId', '==', uId), where('type', '==', 'sales'));
+      const aggSnap = await getAggregateFromServer(aggQuery, { total: sum('total') });
+      setTotalSalesAggregate(aggSnap.data().total || 0);
+
+      // Bills
+      const billQuery = query(collection(db, 'bills'), orderBy('date', 'desc'), limit(100));
+      const billSnap = await getDocs(billQuery);
+      const fetchedBills: Bill[] = [];
+      billSnap.forEach(docSnap => fetchedBills.push({ id: docSnap.id, ...docSnap.data() } as Bill));
+      setBills(fetchedBills);
+
+      // Company
+      const companyQuery = query(collection(db, 'company'), where('userId', '==', uId));
+      const companySnap = await getDocs(companyQuery);
+      if (!companySnap.empty) {
+        const data = companySnap.docs[0].data();
+        setCompanyDetails({
+          name: data.name || '',
+          gstin: data.gstin || '',
+          address: data.address || '',
+          phone: data.phone || '',
+          logoUrl: data.logoUrl || '',
+          deletePassword: data.deletePassword || ''
+        });
+      }
+    } catch (error: any) {
+      console.error("Manual refresh error:", error);
+      const msg = error.message || String(error);
+      if (msg.includes('Quota') || msg.includes('quota') || msg.includes('Quota limit exceeded')) {
+        setSyncError(`Firebase Daily Quota Exceeded. The database has reached its free tier limit and will reset tomorrow.`);
+      } else {
+        setSyncError(`Manual refresh failed: ${msg}`);
+      }
+    } finally {
+      setAppReady(true);
+    }
+  };
+
   // 3. Load and Sync App data (Firestore for Real Auth)
   useEffect(() => {
     if (authInitializing) return;
 
+    // Clean up any existing listeners to prevent duplicates (Strict Mode guard)
+    if (mainSyncUnsubs.current.length > 0) {
+      mainSyncUnsubs.current.forEach(unsub => unsub());
+      mainSyncUnsubs.current = [];
+    }
+
     setAppReady(false);
     
-    if (user) {
+    if (user?.uid) {
       // --- FIRESTORE REAL SYNC ---
       const uId = 'bd0jbxr3P0aaiOB5ou6EwiZnhq43'; // Shared store owner UID so all users share the same database
       setSyncError(null); // Clear previous errors
       
+      const handleSyncError = (error: any, type: string) => {
+        console.error(`${type} sync error:`, error);
+        const msg = error.message || String(error);
+        if (msg.includes('Quota') || msg.includes('quota') || msg.includes('Quota limit exceeded')) {
+          setSyncError(`Firebase Daily Quota Exceeded. The database has reached its free tier limit and will reset tomorrow. (Failed to load ${type})`);
+        } else {
+          setSyncError(`${type} load error: ${msg}`);
+        }
+      };
+
       // Sync Products
       const prodQuery = query(collection(db, 'products'), where('userId', '==', uId));
       const unsubProducts = onSnapshot(prodQuery, (snapshot) => {
@@ -379,26 +487,56 @@ export default function App() {
         setProducts(fetchedProds);
         setAppReady(true);
       }, (error) => {
-        console.error("Products sync error:", error);
-        setSyncError(`Products load error: ${error.message || error}`);
+        handleSyncError(error, 'Products');
         setAppReady(true);
       });
 
       // Sync Transactions (Ledger)
-      const txQuery = query(collection(db, 'transactions'), where('userId', '==', uId));
+      const txQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(150));
       const unsubTransactions = onSnapshot(txQuery, (snapshot) => {
         const fetchedTxs: Transaction[] = [];
         snapshot.forEach((docSnap) => {
           fetchedTxs.push({ id: docSnap.id, ...docSnap.data() } as Transaction);
         });
-        setTransactions(fetchedTxs);
+
+        // Filter out duplicate initial stock entries in memory
+        const txsBySku: { [sku: string]: Transaction[] } = {};
+        fetchedTxs.forEach(tx => {
+          if (tx.sku) {
+            const skuUpper = tx.sku.toUpperCase();
+            if (!txsBySku[skuUpper]) txsBySku[skuUpper] = [];
+            txsBySku[skuUpper].push(tx);
+          }
+        });
+
+        const duplicateIdsToHide = new Set<string>();
+        Object.keys(txsBySku).forEach(sku => {
+          const list = txsBySku[sku];
+          const hasAdminInitial = list.find(t => t.referenceNo === 'INITIAL STOCK ADDED');
+          if (hasAdminInitial) {
+            list.forEach(t => {
+              if (t.id !== hasAdminInitial.id && (t.referenceNo === 'INITIAL-STOCK' || t.referenceNo === 'INITIAL-STOCK-ADDED' || t.referenceNo === 'BULK-IMPORT-NEW')) {
+                duplicateIdsToHide.add(t.id!);
+              }
+            });
+          }
+        });
+
+        const cleanedTxs = fetchedTxs.filter(tx => !duplicateIdsToHide.has(tx.id!));
+        setTransactions(cleanedTxs);
       }, (error) => {
-        console.error("Transactions sync error:", error);
-        setSyncError(`Transactions load error: ${error.message || error}`);
+        handleSyncError(error, 'Transactions');
       });
 
+      // Fetch Total Sales Aggregate
+      getAggregateFromServer(query(collection(db, 'transactions'), where('userId', '==', uId), where('type', '==', 'sales')), {
+        total: sum('total')
+      }).then(snap => {
+        setTotalSalesAggregate(snap.data().total || 0);
+      }).catch(err => console.error('Aggregate error:', err));
+
       // Sync Bills
-      const billQuery = query(collection(db, 'bills'), where('userId', '==', uId));
+      const billQuery = query(collection(db, 'bills'), orderBy('date', 'desc'), limit(100));
       const unsubBills = onSnapshot(billQuery, (snapshot) => {
         const fetchedBills: Bill[] = [];
         snapshot.forEach((docSnap) => {
@@ -406,8 +544,7 @@ export default function App() {
         });
         setBills(fetchedBills);
       }, (error) => {
-        console.error("Bills sync error:", error);
-        setSyncError(`Bills load error: ${error.message || error}`);
+        handleSyncError(error, 'Bills');
       });
 
       // Sync Company Details
@@ -426,14 +563,19 @@ export default function App() {
           });
         }
       }, (error) => {
-        handleFirestoreError(error, OperationType.GET, 'company');
+        const msg = error.message || String(error);
+        if (msg.includes('Quota') || msg.includes('quota')) {
+          handleSyncError(error, 'Company');
+        } else {
+          handleFirestoreError(error, OperationType.GET, 'company');
+        }
       });
 
+      mainSyncUnsubs.current = [unsubProducts, unsubTransactions, unsubBills, unsubCompany];
+
       return () => {
-        unsubProducts();
-        unsubTransactions();
-        unsubBills();
-        unsubCompany();
+        mainSyncUnsubs.current.forEach(unsub => unsub());
+        mainSyncUnsubs.current = [];
       };
 
     } else {
@@ -443,62 +585,8 @@ export default function App() {
       setBills([]);
       setAppReady(true);
     }
-  }, [user, authInitializing]);
+  }, [user?.uid, authInitializing]);
 
-  // Automatic cleanup of duplicate initial-stock/bulk-import-new transactions
-  useEffect(() => {
-    if (!user || transactions.length === 0) return;
-
-    const cleanupDuplicates = async () => {
-      const duplicateIdsToDelete: string[] = [];
-      
-      // Group transactions by SKU
-      const txsBySku: { [sku: string]: Transaction[] } = {};
-      transactions.forEach(tx => {
-        if (tx.sku) {
-          const skuUpper = tx.sku.toUpperCase();
-          if (!txsBySku[skuUpper]) {
-            txsBySku[skuUpper] = [];
-          }
-          txsBySku[skuUpper].push(tx);
-        }
-      });
-
-      // For each SKU, find duplicates
-      Object.keys(txsBySku).forEach(sku => {
-        const list = txsBySku[sku];
-        // We look for t1 with referenceNo 'INITIAL STOCK ADDED'
-        const initialStockAddedTx = list.find(t => t.referenceNo === 'INITIAL STOCK ADDED');
-        if (initialStockAddedTx) {
-          // Find any other initial inward transactions that might be duplicates
-          list.forEach(t => {
-            if (t.id && t.id !== initialStockAddedTx.id) {
-              if (t.referenceNo === 'INITIAL-STOCK' || t.referenceNo === 'INITIAL-STOCK-ADDED' || t.referenceNo === 'BULK-IMPORT-NEW') {
-                duplicateIdsToDelete.push(t.id);
-              }
-            }
-          });
-        }
-      });
-
-      if (duplicateIdsToDelete.length > 0) {
-        console.log("Cleaning up duplicate transactions:", duplicateIdsToDelete);
-        for (const id of duplicateIdsToDelete) {
-          try {
-            await deleteDoc(doc(db, 'transactions', id));
-          } catch (err) {
-            console.error("Error deleting duplicate transaction:", id, err);
-          }
-        }
-      }
-    };
-
-    const timer = setTimeout(() => {
-      cleanupDuplicates();
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [transactions, user]);
 
   // Seed default items into user's Firestore collection to prevent empty board
   const seedFirestoreProducts = async (uId: string) => {
@@ -700,7 +788,12 @@ export default function App() {
         const q = query(collection(db, 'company'), where('userId', '==', uId));
         snap = await getDocs(q);
       } catch (err) {
-        handleFirestoreError(err, OperationType.GET, 'company');
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('Quota') || msg.includes('quota')) {
+          alert('Firebase Daily Quota Exceeded. The database has reached its free tier limit and will reset tomorrow.');
+        } else {
+          handleFirestoreError(err, OperationType.GET, 'company');
+        }
         return;
       }
 
@@ -713,6 +806,8 @@ export default function App() {
             updatedAt: new Date().toISOString()
           });
         } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('Quota') || msg.includes('quota')) alert('Firebase Daily Quota Exceeded.');
           handleFirestoreError(err, OperationType.UPDATE, `company/${docId}`);
           return;
         }
@@ -724,6 +819,8 @@ export default function App() {
             updatedAt: new Date().toISOString()
           });
         } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('Quota') || msg.includes('quota')) alert('Firebase Daily Quota Exceeded.');
           handleFirestoreError(err, OperationType.CREATE, 'company');
           return;
         }
@@ -900,6 +997,13 @@ export default function App() {
               {syncError 
                 ? (language === 'en' ? 'Sync Error' : 'ஒத்திசைவு பிழை') 
                 : (language === 'en' ? 'Cloud Sync' : 'கிளவுட் ஒத்திசைவு')}
+              <button 
+                onClick={handleForceRefresh}
+                className="ml-2 hover:text-white underline"
+                title="Force Refresh Data"
+              >
+                <RotateCcw className="w-3 h-3 inline-block" />
+              </button>
             </p>
           </div>
         </div>
@@ -920,13 +1024,20 @@ export default function App() {
       } md:flex`}>
         <div className="p-6">
           {/* App Logo & Title */}
-          <div className="hidden md:flex items-center gap-3 mb-8 pb-6 border-b border-slate-800">
+          <div className="hidden md:flex items-center gap-3 mb-8 pb-6 border-b border-slate-800 relative">
             {companyDetails?.logoUrl ? (
               <img src={companyDetails.logoUrl} alt="Logo" className="w-8 h-8 rounded object-cover bg-white" referrerPolicy="no-referrer" />
             ) : (
               <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-extrabold text-white text-sm">A</div>
             )}
-            <h1 className="text-white font-bold tracking-tight uppercase text-sm truncate">{t.inventoryApp}</h1>
+            <h1 className="text-white font-bold tracking-tight uppercase text-sm truncate flex-1">{t.inventoryApp}</h1>
+            <button 
+              onClick={handleForceRefresh}
+              className="text-slate-400 hover:text-white transition-colors p-1"
+              title="Force Refresh Data"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
           </div>
 
           <div className="mb-8 border-b border-slate-800 pb-5">
@@ -1117,6 +1228,7 @@ export default function App() {
                   products={products} 
                   transactions={transactions} 
                   bills={bills}
+                  totalSalesAggregate={totalSalesAggregate}
                   userRole={userRole}
                   onDeleteBill={handleDeleteBill}
                   onDeleteTransaction={handleDeleteTransaction}

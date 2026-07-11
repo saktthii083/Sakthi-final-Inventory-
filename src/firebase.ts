@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase App
@@ -9,7 +9,9 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase Services with correct database ID and robust connection settings to avoid WebChannel and RPC listen stream warnings
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 }, firebaseConfig.firestoreDatabaseId);
+
 export const auth = getAuth();
 export const googleProvider = new GoogleAuthProvider();
 
@@ -58,7 +60,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   console.error('Firestore Error Details: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  return new Error(JSON.stringify(errInfo));
 }
 
 // Connection check verification
@@ -71,5 +73,3 @@ export async function testConnection() {
     }
   }
 }
-
-testConnection();

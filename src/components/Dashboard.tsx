@@ -20,11 +20,12 @@ interface DashboardProps {
   onUpdateUserRole?: (targetUid: string, newRole: 'admin' | 'user') => Promise<void>;
   onDeleteUser?: (targetUid: string) => Promise<void>;
   onAddUser?: (newUser: Omit<UserProfile, 'updatedAt'>) => Promise<void>;
+  totalSalesAggregate?: number;
 }
 
 export default function Dashboard({ 
   language, products, transactions, bills, userRole, deletionPower, onDeleteBill, onDeleteTransaction,
-  usersList, onUpdateUserRole, onDeleteUser, onAddUser
+  usersList, onUpdateUserRole, onDeleteUser, onAddUser, totalSalesAggregate
 }: DashboardProps) {
   const t = translations[language];
   const [selectedBill, setSelectedBill] = React.useState<Bill | null>(null);
@@ -100,9 +101,9 @@ export default function Dashboard({
   const totalStockValue = products.reduce((sum, item) => sum + (item.quantity * item.purchasePrice), 0);
 
   // Total Sales (sum of totals of outward/sales transactions)
-  const totalSalesRevenue = transactions
-    .filter(tx => tx.type === 'sales')
-    .reduce((sum, tx) => sum + tx.total, 0);
+  const totalSalesRevenue = totalSalesAggregate !== undefined
+    ? totalSalesAggregate
+    : transactions.filter(tx => tx.type === 'sales').reduce((sum, tx) => sum + tx.total, 0);
 
   // Low Stock Count (quantity <= minStock)
   const lowStockItems = products.filter(item => item.quantity <= item.minStock);
