@@ -324,7 +324,7 @@ export default function App() {
 
     if (user) {
       try {
-        setAppReady(false);
+        console.log("Firebase sync triggered for user", user?.uid); setAppReady(false);
         
         // Clear products
         const prodQuery = query(collection(db, 'products'), where('userId', '==', user.uid));
@@ -369,7 +369,7 @@ export default function App() {
 
   const handleForceRefresh = async () => {
     if (!user?.uid) return;
-    setAppReady(false);
+    console.log("Firebase sync triggered for user", user?.uid); setAppReady(false);
     setSyncError(null);
     const uId = 'bd0jbxr3P0aaiOB5ou6EwiZnhq43';
 
@@ -382,7 +382,7 @@ export default function App() {
       setProducts(fetchedProds);
 
       // Force fetch transactions
-      const txQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(150));
+      const txQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(50));
       const txSnap = await getDocs(txQuery);
       const fetchedTxs: Transaction[] = [];
       txSnap.forEach(docSnap => fetchedTxs.push({ id: docSnap.id, ...docSnap.data() } as Transaction));
@@ -415,7 +415,7 @@ export default function App() {
       setTotalSalesAggregate(aggSnap.data().total || 0);
 
       // Bills
-      const billQuery = query(collection(db, 'bills'), orderBy('date', 'desc'), limit(100));
+      const billQuery = query(collection(db, 'bills'), orderBy('date', 'desc'), limit(50));
       const billSnap = await getDocs(billQuery);
       const fetchedBills: Bill[] = [];
       billSnap.forEach(docSnap => fetchedBills.push({ id: docSnap.id, ...docSnap.data() } as Bill));
@@ -458,7 +458,7 @@ export default function App() {
       mainSyncUnsubs.current = [];
     }
 
-    setAppReady(false);
+    console.log("Firebase sync triggered for user", user?.uid); setAppReady(false);
     
     if (user?.uid) {
       // --- FIRESTORE REAL SYNC ---
@@ -492,7 +492,7 @@ export default function App() {
       });
 
       // Sync Transactions (Ledger)
-      const txQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(150));
+      const txQuery = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(50));
       const unsubTransactions = onSnapshot(txQuery, (snapshot) => {
         const fetchedTxs: Transaction[] = [];
         snapshot.forEach((docSnap) => {
@@ -536,7 +536,7 @@ export default function App() {
       }).catch(err => console.error('Aggregate error:', err));
 
       // Sync Bills
-      const billQuery = query(collection(db, 'bills'), orderBy('date', 'desc'), limit(100));
+      const billQuery = query(collection(db, 'bills'), orderBy('date', 'desc'), limit(50));
       const unsubBills = onSnapshot(billQuery, (snapshot) => {
         const fetchedBills: Bill[] = [];
         snapshot.forEach((docSnap) => {
