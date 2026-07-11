@@ -3,7 +3,7 @@ import { Bill, Language, UserProfile, Product, Transaction } from '../types';
 import { translations } from '../translations';
 import { 
   ShoppingBag, Search, X, Trash2, Calendar, CreditCard, User, Printer, FileText, Filter, ChevronDown, ArrowUpCircle,
-  Image as ImageIcon, Send, RefreshCw, Download
+  Image as ImageIcon, Send, RefreshCw, Download, ExternalLink
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -272,6 +272,22 @@ export default function RecentSales({
     // Open WhatsApp deep link directly to contact chat as requested (without any pre-typed message)
     const whatsappUrl = `https://wa.me/${formattedPhone}`;
     window.open(whatsappUrl, '_blank');
+  };
+
+  const handlePrint = () => {
+    try {
+      window.focus();
+      window.print();
+    } catch (err) {
+      console.error("Print failed:", err);
+      setFeedback({
+        type: 'error',
+        text: language === 'en' 
+          ? 'Print dialog blocked by browser. Please open in a new tab.' 
+          : 'அச்சிடும் சாளரம் தடுக்கப்பட்டது. தயவுசெய்து புதிய டேப்பில் திறந்து முயற்சிக்கவும்.'
+      });
+      setTimeout(() => setFeedback(null), 5000);
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -1033,13 +1049,32 @@ export default function RecentSales({
                 </button>
               </div>
 
+              {/* Desktop Iframe Print Help Tip */}
+              <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-[11px] text-amber-800 font-bold space-y-2">
+                <p className="flex items-center gap-1.5 font-extrabold text-amber-900">
+                  ⚠️ {language === 'en' ? 'Print Notice for Desktop Users:' : 'கம்ப்யூட்டர் பயனர்களுக்கான குறிப்பு:'}
+                </p>
+                <p className="leading-relaxed font-medium">
+                  {language === 'en' 
+                    ? "If clicking 'Print Bill' does not open the print window, it is because this preview is sandboxed. Please click the button below to load the app directly in a new tab, where printing works perfectly!"
+                    : "பிரிண்ட் பட்டன் வேலை செய்யவில்லை என்றால், கீழே உள்ள பட்டனை கிளிக் செய்து புதிய விண்டோவில் இந்த ஆப்பைத் திறந்து பிரிண்ட் செய்யவும். அது சரியாக வேலை செய்யும்!"}
+                </p>
+                <a 
+                  href={window.location.href}
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="inline-flex items-center justify-center gap-1.5 w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-center text-xs transition-all cursor-pointer shadow-xs"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  {language === 'en' ? 'Open App in New Tab' : 'பிரிண்ட் செய்ய புதிய டேப்பில் திறக்கவும்'}
+                </a>
+              </div>
+
               {/* Print and Close buttons */}
               <div className="flex gap-2 border-t border-slate-200/60 pt-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    window.print();
-                  }}
+                  onClick={handlePrint}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
                 >
                   <Printer className="h-4 w-4" />
@@ -1080,8 +1115,8 @@ export default function RecentSales({
                 {companyDetails?.name || (language === 'en' ? 'Inventory Store' : 'சரக்குக் கடை')}
               </h3>
               {companyDetails?.gstin && (
-                <p className="text-[10px] text-slate-500 font-medium">
-                  {language === 'en' ? 'GSTIN: ' : 'பதிவு எண்: '} {companyDetails.gstin}
+                <p className="text-[10px] text-slate-500 font-medium uppercase">
+                  {language === 'en' ? 'GSTIN: ' : 'பதிவு எண்: '} {companyDetails.gstin.toUpperCase()}
                 </p>
               )}
               {companyDetails?.address && (
@@ -1118,8 +1153,8 @@ export default function RecentSales({
               )}
               {selectedBill.customerGst && (
                 <div className="flex justify-between">
-                  <span>Customer GSTIN:</span>
-                  <span className="text-slate-900 font-mono font-bold uppercase">{selectedBill.customerGst}</span>
+                   <span>Customer GSTIN:</span>
+                  <span className="text-slate-900 font-mono font-bold uppercase">{selectedBill.customerGst.toUpperCase()}</span>
                 </div>
               )}
               {selectedBill.customerAddress && (

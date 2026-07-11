@@ -96,7 +96,7 @@ export default function CompanySettings({ language, companyDetails, onSave, onCl
     try {
       await onSave({
         name: name.trim(),
-        gstin: gstin.trim(),
+        gstin: gstin.trim().toUpperCase(),
         address: address.trim(),
         phone: phone.trim(),
         logoUrl: logoUrl,
@@ -215,7 +215,7 @@ export default function CompanySettings({ language, companyDetails, onSave, onCl
             <input
               type="text"
               value={gstin}
-              onChange={(e) => setGstin(e.target.value)}
+              onChange={(e) => setGstin(e.target.value.toUpperCase())}
               placeholder="e.g. 33AAAAA1111A1Z1"
               className="block w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono uppercase"
             />

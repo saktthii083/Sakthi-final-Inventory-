@@ -808,6 +808,10 @@ export default function App() {
   const handleSaveCompanyDetails = async (details: { name: string; gstin: string; address: string; phone: string; logoUrl?: string; deletePassword?: string }) => {
     if (user) {
       const uId = 'bd0jbxr3P0aaiOB5ou6EwiZnhq43';
+      const formattedDetails = {
+        ...details,
+        gstin: details.gstin.trim().toUpperCase()
+      };
       let snap;
       try {
         const q = query(collection(db, 'company'), where('userId', '==', uId));
@@ -827,7 +831,7 @@ export default function App() {
         try {
           const docRef = doc(db, 'company', docId);
           await updateDoc(docRef, {
-            ...details,
+            ...formattedDetails,
             updatedAt: new Date().toISOString()
           });
         } catch (err) {
@@ -839,7 +843,7 @@ export default function App() {
       } else {
         try {
           await addDoc(collection(db, 'company'), {
-            ...details,
+            ...formattedDetails,
             userId: uId,
             updatedAt: new Date().toISOString()
           });
