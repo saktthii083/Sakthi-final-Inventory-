@@ -4,8 +4,7 @@ import { translations } from '../translations';
 import { 
   ShoppingCart, Trash2, Plus, Minus, Printer, Save, RefreshCw, 
   Search, User, Phone, Sparkles, Receipt, X, ArrowUpCircle,
-  ChevronDown, ChevronUp, Eye, Send, Share2, Download, FileText, Image as ImageIcon,
-  ExternalLink
+  ChevronDown, ChevronUp, Eye, Send, Share2, Download, FileText, Image as ImageIcon
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -463,18 +462,83 @@ export default function Billing({
     window.open(whatsappUrl, '_blank');
   };
 
-  // Print Bill via standard browser print
+  // Print Bill via standard browser print utilizing a clean temporary iframe
   const handlePrint = () => {
-    try {
-      window.focus();
-      window.print();
-    } catch (err) {
-      console.error("Print failed:", err);
-      triggerFeedback('error', language === 'en' 
-        ? 'Print dialog blocked by browser. Please open in a new tab.' 
-        : 'அச்சிடும் சாளரம் தடுக்கப்பட்டது. தயவுசெய்து புதிய டேப்பில் திறந்து முயற்சிக்கவும்.'
-      );
+    if (!showPrintInvoice) return;
+    const element = document.getElementById('printable-receipt-area');
+    if (!element) {
+      triggerFeedback('error', 'Bill content not found.');
+      return;
     }
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (!iframeDoc) {
+      triggerFeedback('error', 'Could not open print context.');
+      return;
+    }
+
+    let styles = '';
+    document.querySelectorAll('style, link[rel="stylesheet"]').forEach((style) => {
+      styles += style.outerHTML;
+    });
+
+    iframeDoc.write(`
+      <html>
+        <head>
+          <title>Bill_${showPrintInvoice.billNo}</title>
+          \${styles}
+          <style>
+            body {
+              background: white !important;
+              color: black !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            #printable-receipt-area {
+              width: 100% !important;
+              box-shadow: none !important;
+              padding: 16px !important;
+              margin: 0 !important;
+              display: block !important;
+              visibility: visible !important;
+            }
+            @page {
+              size: auto;
+              margin: 4mm 0mm;
+            }
+          </style>
+        </head>
+        <body>
+          <div id="printable-receipt-area" class="p-6 font-sans text-slate-800 bg-white">
+            \${element.innerHTML}
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                setTimeout(function() {
+                  if (window.frameElement) {
+                    window.frameElement.remove();
+                  }
+                }, 500);
+              }, 300);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    iframeDoc.close();
   };
 
   // Download Bill as PDF
@@ -1623,27 +1687,6 @@ export default function Billing({
                       : (language === 'en' ? 'Download Image' : 'படம் பதிவிறக்கு')}
                   </span>
                 </button>
-              </div>
-
-              {/* Desktop Iframe Print Help Tip */}
-              <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-[11px] text-amber-800 font-bold space-y-2">
-                <p className="flex items-center gap-1.5 font-extrabold text-amber-900">
-                  ⚠️ {language === 'en' ? 'Print Notice for Desktop Users:' : 'கம்ப்யூட்டர் பயனர்களுக்கான குறிப்பு:'}
-                </p>
-                <p className="leading-relaxed font-medium">
-                  {language === 'en' 
-                    ? "If clicking 'Print Bill' does not open the print window, it is because this preview is sandboxed. Please click the button below to load the app directly in a new tab, where printing works perfectly!"
-                    : "பிரிண்ட் பட்டன் வேலை செய்யவில்லை என்றால், கீழே உள்ள பட்டனை கிளிக் செய்து புதிய விண்டோவில் இந்த ஆப்பைத் திறந்து பிரிண்ட் செய்யவும். அது சரியாக வேலை செய்யும்!"}
-                </p>
-                <a 
-                  href={window.location.href}
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="inline-flex items-center justify-center gap-1.5 w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-center text-xs transition-all cursor-pointer shadow-xs"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  {language === 'en' ? 'Open App in New Tab' : 'பிரிண்ட் செய்ய புதிய டேப்பில் திறக்கவும்'}
-                </a>
               </div>
 
               {/* Print and Close buttons */}

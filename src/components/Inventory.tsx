@@ -722,18 +722,18 @@ export default function Inventory({
 
     if (exportType === 'stock') {
       const headers = [
-        'SKU',
         language === 'en' ? 'Product Name' : 'தயாரிப்பு பெயர்',
+        language === 'en' ? 'Color' : 'வண்ணம்',
+        language === 'en' ? 'Size' : 'அளவு',
         language === 'en' ? 'Category' : 'வகை',
         language === 'en' ? 'Quantity' : 'இருப்பு அளவு',
         language === 'en' ? 'Unit' : 'அலகு',
         language === 'en' ? 'Selling Price' : 'விற்பனை விலை',
         language === 'en' ? 'Manufacturing Cost' : 'உற்பத்தி செலவு',
+        language === 'en' ? 'Max Discount' : 'அதிகபட்ச தள்ளுபடி',
         language === 'en' ? 'Min Stock' : 'குறைந்தபட்ச இருப்பு',
         language === 'en' ? 'Material' : 'மெட்டீரியல்',
         language === 'en' ? 'GSM' : 'ஜிஎஸ்எம்',
-        language === 'en' ? 'Color' : 'வண்ணம்',
-        language === 'en' ? 'Size' : 'அளவு',
         language === 'en' ? 'Location' : 'இடம்',
         language === 'en' ? 'Description' : 'விளக்கம்'
       ];
@@ -771,18 +771,18 @@ export default function Inventory({
 
       list.forEach((p) => {
         const row = [
-          p.sku,
           p.name,
+          p.color || '',
+          p.size || '',
           p.category,
           p.quantity,
           p.unit || 'pcs',
           p.sellingPrice,
           p.purchasePrice,
+          p.maxDiscount !== undefined ? p.maxDiscount : '',
           p.minStock,
           p.material || '',
           p.gsm || '',
-          p.color || '',
-          p.size || '',
           p.location || '',
           p.description || ''
         ];
