@@ -287,11 +287,11 @@ export default function RecentSales({
     }
 
     const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
+    iframe.style.position = 'absolute';
+    iframe.style.top = '-9999px';
+    iframe.style.left = '-9999px';
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
     iframe.style.border = '0';
     document.body.appendChild(iframe);
 
@@ -314,7 +314,7 @@ export default function RecentSales({
       <html>
         <head>
           <title>Bill_${selectedBill.billNo}</title>
-          \${styles}
+          ${styles}
           <style>
             body {
               background: white !important;
@@ -340,7 +340,7 @@ export default function RecentSales({
         </head>
         <body>
           <div id="printable-receipt-area" class="p-6 font-sans text-slate-800 bg-white">
-            \${element.innerHTML}
+            ${element.innerHTML}
           </div>
           <script>
             window.onload = function() {
