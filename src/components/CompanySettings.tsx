@@ -15,9 +15,11 @@ interface CompanySettingsProps {
   language: Language;
   companyDetails: CompanyDetails;
   onSave: (details: CompanyDetails) => Promise<void>;
+  onCleanDuplicates?: () => Promise<void>;
 }
 
-export default function CompanySettings({ language, companyDetails, onSave }: CompanySettingsProps) {
+export default function CompanySettings({ language, companyDetails, onSave, onCleanDuplicates }: CompanySettingsProps) {
+  const [isCleaning, setIsCleaning] = React.useState(false);
   const [name, setName] = React.useState(companyDetails.name || '');
   const [gstin, setGstin] = React.useState(companyDetails.gstin || '');
   const [address, setAddress] = React.useState(companyDetails.address || '');
@@ -107,7 +109,7 @@ export default function CompanySettings({ language, companyDetails, onSave }: Co
     }
   };
 
-  return (
+  return (<>
     <div className="space-y-6 font-sans max-w-2xl mx-auto">
       {/* Title block */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -282,5 +284,31 @@ export default function CompanySettings({ language, companyDetails, onSave }: Co
         </div>
       </form>
     </div>
+
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mt-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          {language === 'en' ? 'System Maintenance' : 'கணினி பராமரிப்பு'}
+        </h2>
+        <p className="text-sm text-gray-500 mb-4 font-medium leading-relaxed">
+          {language === 'en' 
+            ? 'Clean up duplicate system logs (e.g., duplicate INITIAL STOCK entries) to reduce backend database reads and improve loading performance. If opening the app causes high reads, this will reduce them.' 
+            : 'பின்னணி தரவுத்தள வாசிப்புகளைக் குறைக்கவும் செயல்திறனை மேம்படுத்தவும் நகல் கணினி பதிவுகளை (எ.கா. INITIAL STOCK) அழிக்கவும்.'}
+        </p>
+        <button
+          onClick={async () => {
+            if (onCleanDuplicates) {
+              setIsCleaning(true);
+              await onCleanDuplicates();
+              setIsCleaning(false);
+              alert(language === 'en' ? 'Cleanup complete!' : 'சுத்தம் முடிந்தது!');
+            }
+          }}
+          disabled={isCleaning}
+          className="flex items-center gap-2 px-6 py-3 bg-amber-100 text-amber-800 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-amber-200 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+        >
+          {isCleaning ? (language === 'en' ? 'Cleaning...' : 'சுத்தம் செய்கிறது...') : (language === 'en' ? 'Clean Duplicate Logs' : 'நகல் பதிவுகளை அழி')}
+        </button>
+      </div>
+    </>
   );
 }

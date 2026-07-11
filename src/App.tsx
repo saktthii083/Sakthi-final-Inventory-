@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs, getDoc, setDoc, orderBy, limit, getAggregateFromServer, sum 
+  collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs, writeBatch, getDoc, setDoc, orderBy, limit, getAggregateFromServer, sum 
 } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { motion, AnimatePresence } from 'motion/react';
@@ -780,6 +780,31 @@ export default function App() {
   };
 
   // Save Company Details Settings
+
+  const handleCleanDuplicates = async () => {
+    if (userRole !== 'admin') return;
+    try {
+      const q = query(collection(db, 'transactions'), where('userId', '==', 'bd0jbxr3P0aaiOB5ou6EwiZnhq43'));
+      const snap = await getDocs(q);
+      const batch = writeBatch(db);
+      let count = 0;
+      snap.forEach(docSnap => {
+        const ref = docSnap.data().referenceNo;
+        if (ref === 'INITIAL STOCK ADDED' || ref === 'INITIAL-STOCK' || ref === 'INITIAL-STOCK-ADDED') {
+          batch.delete(docSnap.ref);
+          count++;
+        }
+      });
+      if (count > 0) {
+        await batch.commit();
+        console.log(`Deleted ${count} duplicates`);
+      }
+    } catch (err) {
+      console.error('Error cleaning duplicates:', err);
+      alert('Error cleaning duplicates. See console.');
+    }
+  };
+
   const handleSaveCompanyDetails = async (details: { name: string; gstin: string; address: string; phone: string; logoUrl?: string; deletePassword?: string }) => {
     if (user) {
       const uId = 'bd0jbxr3P0aaiOB5ou6EwiZnhq43';
@@ -1272,6 +1297,7 @@ export default function App() {
                   language={language}
                   companyDetails={companyDetails}
                   onSave={handleSaveCompanyDetails}
+                  onCleanDuplicates={handleCleanDuplicates}
                 />
               )}
 
